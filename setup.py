@@ -2,8 +2,9 @@
 import os
 import shutil
 import sys
+from glob import glob
 from setuptools import setup, find_packages
-
+from torch.utils.cpp_extension import CppExtension, BuildExtension
 
 readme = open('README.rst').read()
 
@@ -22,6 +23,8 @@ setup(
 
     # Package info
     packages=find_packages(exclude=('test',)),
-
-    zip_safe=True,
+    ext_modules=[
+        CppExtension('torchcontrib._C', glob('torchcontrib/csrc/*.cpp'))
+    ],
+    cmdclass={'build_ext': BuildExtension},
 )
