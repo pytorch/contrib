@@ -31,10 +31,11 @@ class SWA(Optimizer):
         if not all(params_none) and any(params_none):
             warnings.warn(
                 "Some of swa_start, swa_freq, swa_lr is None, ignoring others")
-        for param in params:
+            # TODO: we can avoid swa_lr
+        for param in params[:-1]:
             if param is not None and not isinstance(param, int):
                 param = int(param)
-                warnings.warn("Casting swa_start, swa_freq, swa_lr to int")
+                warnings.warn("Casting swa_start, swa_freq to int")
         return not any(params_none), params
 
     def _make_shadow_vars(self):
@@ -55,24 +56,21 @@ class SWA(Optimizer):
                 param_state = self.state[p]
                 buf = param_state['swa_buffer']
                 virtual_decay = 1 / (self.n_avg + 1)
+                print("Virtual decay", virtual_decay)
                 diff = (p.data - buf) * virtual_decay
                 buf.add_(diff)
-                self.n_avg += 1
+        self.n_avg += 1
 
     def swap_swa_sgd(self):
         for group in self.param_groups:
             for p in group['params']:
                 param_state = self.state[p]
                 buf = param_state['swa_buffer']
-                print('p', p.data[0])
-                print('p_buf', param_state['swa_buffer'][0])
-                tmp = p.data
-                p.data = buf
-                buf += tmp - buf
-                print('p', p.data[0])
-                print('p_buf', param_state['swa_buffer'][0])
-                print()
-                ##TODO: is it an ok way of doing this?
+                tmp = torch.empty_like(p.data)
+                tmp.copy_(p.data)
+                p.data.copy_(buf)
+                buf.copy_(tmp)
+                #TODO: is it an ok way of doing this?
 
     def step(self):
         if self.auto_mode:
