@@ -22,11 +22,13 @@ def wrap_old_fn(old_fn, **config):
     return wrapper
 
 
-class TestOptim(unittest.TestCase):
+class TestSWA(unittest.TestCase):
+    # Pavel: I slightly update the _test_... functions to (1) remove the
+    # legacy-related parts and (2) add oprimizer.swap_swa_sgd() in the end of
+    # optimization
 
-    def _test_rosenbrock(self, constructor, old_fn):
-        params_t = torch.Tensor([1.5, 1.5])
-        state = {}
+    def _test_rosenbrock(self, constructor):
+        #state = {}
 
         params = Variable(torch.Tensor([1.5, 1.5]), requires_grad=True)
         optimizer = constructor([params])
@@ -35,6 +37,7 @@ class TestOptim(unittest.TestCase):
         initial_dist = params.data.dist(solution)
 
         def eval():
+            # SWA
             optimizer.zero_grad()
             loss = rosenbrock(params)
             loss.backward()
@@ -49,9 +52,7 @@ class TestOptim(unittest.TestCase):
 
         for i in range(2000):
             optimizer.step(eval)
-            old_fn(lambda _: (rosenbrock(params_t), drosenbrock(params_t)),
-                   params_t, state)
-            self.assertEqual(params.data, params_t)
+        optimizer.swap_swa_sgd()
 
         self.assertLessEqual(params.data.dist(solution), initial_dist)
 
@@ -228,3 +229,14 @@ class TestOptim(unittest.TestCase):
 
     def _build_params_dict_single(self, weight, bias, **kwargs):
         return [dict(params=bias, **kwargs)]
+
+    #Test SWA
+    
+    def test_swa(self):
+        def constructor(params):
+            sgd = torch.optim.SGD(params, lr=1e-3)
+            return torchcontrib.optim.SWA(
+                sgd, swa_start=1000, swa_freq=1, swa_lr=1e-3)
+        self.__test_rosenbrock(
+            constructor
+        )

@@ -72,12 +72,12 @@ class SWA(Optimizer):
                 buf.copy_(tmp)
                 #TODO: is it an ok way of doing this?
 
-    def step(self):
+    def step(self, closure=None):
         if self.auto_mode:
             swa_started = self.step_counter >= self.swa_start
             if swa_started:
                 self._reset_lr_to_swa()
-        loss = self.optimizer.step()
+        loss = self.optimizer.step(closure)
         self.step_counter += 1
         if self.auto_mode:
             steps = self.step_counter
