@@ -4,6 +4,8 @@ from copy import deepcopy
 import torch
 from torch.autograd import Variable
 from torch import sparse
+from torch import optim
+import torchcontrib.optim as contriboptim
 
 
 def rosenbrock(tensor):
@@ -233,10 +235,15 @@ class TestSWA(unittest.TestCase):
     #Test SWA
     
     def test_swa(self):
+        print("here")
         def constructor(params):
-            sgd = torch.optim.SGD(params, lr=1e-3)
-            return torchcontrib.optim.SWA(
+            sgd = optim.SGD(params, lr=1e-3)
+            return contriboptim.SWA(
                 sgd, swa_start=1000, swa_freq=1, swa_lr=1e-3)
-        self.__test_rosenbrock(
+        self._test_rosenbrock(
             constructor
         )
+
+
+if __name__ == '__main__':
+    unittest.main()
