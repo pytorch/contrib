@@ -1,16 +1,20 @@
 from torch.optim import Optimizer
+import torch
+import warnings
 
 class SWA(Optimizer):
     def __init__(self, optimizer, swa_start=None, swa_freq=None, swa_lr=None):
         r"""
         swa_freq = None => call swa_upd manually
         """
-        self.auto_mode = self._check_params(self, optimizer)
+        self.auto_mode, (self.swa_start, self.swa_freq, self.swa_lr) = \
+                self._check_params(self, swa_start, swa_freq, swa_lr)
 
         self.optimizer = optimizer
-        self.swa_start = swa_start
-        self.swa_freq = swa_freq
-        self.swa_lr = swa_lr
+        print('SWA')
+        print('start', self.swa_start)
+        print('freq', self.swa_freq)
+        print('lr', self.swa_lr)
 
         self.step_counter = 0
         self.param_groups = self.optimizer.param_groups
@@ -18,17 +22,22 @@ class SWA(Optimizer):
         self._make_shadow_vars()
 
         self.n_avg = 0
-        self.state['n_avg'] = n_avg
+        self.state['n_avg'] = self.n_avg
 
     @staticmethod
-    def _check_params(swa_start, swa_freq, swa_lr):
-        params_none = [param is None for param in [swa_start, swa_freq, swa_lr]]
+    def _check_params(self, swa_start, swa_freq, swa_lr):
+        params = [swa_start, swa_freq, swa_lr]
+        params_none = [param is None for param in params]
         if not all(params_none) and any(params_none):
-            import warnings.warn(
+            warnings.warn(
                 "Some of swa_start, swa_freq, swa_lr is None, ignoring others")
-        return not any(params_none)
+        for param in params:
+            if param is not None and not isinstance(param, int):
+                param = int(param)
+                warnings.warn("Casting swa_start, swa_freq, swa_lr to int")
+        return not any(params_none), params
 
-    def _make_shadow_vars():
+    def _make_shadow_vars(self):
         for group in self.param_groups:
             for p in group['params']:
                 param_state = self.state[p]
@@ -40,8 +49,10 @@ class SWA(Optimizer):
             param_group['lr'] = self.swa_lr
 
     def swa_upd(self):
+        print("Doing SWA Update")
         for group in self.param_groups:
             for p in group['params']:
+                param_state = self.state[p]
                 buf = param_state['swa_buffer']
                 virtual_decay = 1 / (self.n_avg + 1)
                 diff = (p.data - buf) * virtual_decay
@@ -51,11 +62,17 @@ class SWA(Optimizer):
     def swap_swa_sgd(self):
         for group in self.param_groups:
             for p in group['params']:
+                param_state = self.state[p]
                 buf = param_state['swa_buffer']
+                print('p', p.data[0])
+                print('p_buf', param_state['swa_buffer'][0])
                 tmp = p.data
                 p.data = buf
-                buf = tmp
-                #TODO: is it an ok way of doing this?
+                buf += tmp - buf
+                print('p', p.data[0])
+                print('p_buf', param_state['swa_buffer'][0])
+                print()
+                ##TODO: is it an ok way of doing this?
 
     def step(self):
         if self.auto_mode:
@@ -72,14 +89,13 @@ class SWA(Optimizer):
 
 # BatchNorm utils
 
-def _check_bn(module, flag):
+def _check_bn_apply(module, flag):
     if issubclass(module.__class__, torch.nn.modules.batchnorm._BatchNorm):
         flag[0] = True
 
-
 def _check_bn(model):
     flag = [False]
-    model.apply(lambda module: _check_bn(module, flag))
+    model.apply(lambda module: _check_bn_apply(module, flag))
     return flag[0]
 
 

@@ -105,7 +105,9 @@ optimizer = torch.optim.SGD(
 if args.swa:
     # SWA: initialize SWA optimizer wrapper
     print('SWA training')
-    steps_per_epoch = len(trainset) / args.batch_size
+    steps_per_epoch = len(loaders['train'].dataset) / args.batch_size
+    steps_per_epoch = int(steps_per_epoch)
+    print(f"Steps per epoch: {steps_per_epoch}")
     optimizer = SWA(optimizer, swa_start=args.swa_start * steps_per_epoch,
                     swa_freq=steps_per_epoch, swa_lr=args.swa_lr)
 else:
@@ -142,7 +144,7 @@ for epoch in range(start_epoch, args.epochs):
     else:
         test_res = {'loss': None, 'accuracy': None}
 
-    if args.swa and (epoch + 1) >= args.swa_start and (epoch + 1 - args.swa_start) % args.swa_c_epochs == 0:
+    if args.swa and (epoch + 1) >= args.swa_start:
         #utils.moving_average(swa_model, model, 1.0 / (swa_n + 1))
         #swa_n += 1
         if epoch == 0 or epoch % args.eval_freq == args.eval_freq - 1 or epoch == args.epochs - 1:
