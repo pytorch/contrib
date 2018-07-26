@@ -56,7 +56,7 @@ class SWA(Optimizer):
                 param_state = self.state[p]
                 buf = param_state['swa_buffer']
                 virtual_decay = 1 / (self.n_avg + 1)
-                print("Virtual decay", virtual_decay)
+                #print("Virtual decay", virtual_decay)
                 diff = (p.data - buf) * virtual_decay
                 buf.add_(diff)
         self.n_avg += 1
