@@ -22,9 +22,9 @@ class SWA(Optimizer):
         self.param_groups = self.optimizer.param_groups
         self.state = defaultdict(dict)
         self.state['opt_state'] = self.optimizer.state
-
-        self.n_avg = 0
-        self.state['n_avg'] = self.n_avg
+        #self.state['n_avg'] = 0
+        for group in self.param_groups:
+            group['n_avg'] = 0
 
     @staticmethod
     def _check_params(self, swa_start, swa_freq):
@@ -53,10 +53,11 @@ class SWA(Optimizer):
                 if 'swa_buffer' not in param_state:
                     param_state['swa_buffer'] = torch.zeros_like(p.data)
                 buf = param_state['swa_buffer']
-                virtual_decay = 1 / (self.n_avg + 1)
+                #virtual_decay = 1 / (self.state["n_avg"] + 1)
+                virtual_decay = 1 / (group["n_avg"] + 1)
                 diff = (p.data - buf) * virtual_decay
                 buf.add_(diff)
-        self.n_avg += 1
+        group["n_avg"] += 1
 
     def swap_swa_sgd(self):
         for group in self.param_groups:
