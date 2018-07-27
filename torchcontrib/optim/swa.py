@@ -83,6 +83,12 @@ class SWA(Optimizer):
                 self.update_swa()
         return loss
 
+    def load_state_dict(self, state_dict):
+        super(SWA, self).load_state_dict(state_dict)
+        self.optimizer.state.update(self.state["opt_state"])
+        self.state['opt_state'] = self.optimizer.state
+
+
 # BatchNorm utils
 
 def _check_bn_apply(module, flag):
