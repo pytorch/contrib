@@ -8,8 +8,9 @@ class SWA(Optimizer):
         r"""
         swa_freq = None => call swa_upd manually
         """
-        self.auto_mode, (self.swa_start, self.swa_freq, self.swa_lr) = \
-                self._check_params(self, swa_start, swa_freq, swa_lr)
+        self.auto_mode, (self.swa_start, self.swa_freq) = \
+                self._check_params(self, swa_start, swa_freq)
+        self.swa_lr = swa_lr
 
         self.optimizer = optimizer
         print('SWA')
@@ -26,16 +27,16 @@ class SWA(Optimizer):
         self.state['n_avg'] = self.n_avg
 
     @staticmethod
-    def _check_params(self, swa_start, swa_freq, swa_lr):
+    def _check_params(self, swa_start, swa_freq):
         # TODO: not raise error if swa_lr None
         # TODO: raise error if negative swa_start, swa_freq
-        params = [swa_start, swa_freq, swa_lr]
+        params = [swa_start, swa_freq]
         params_none = [param is None for param in params]
         if not all(params_none) and any(params_none):
             warnings.warn(
-                "Some of swa_start, swa_freq, swa_lr is None, ignoring others")
+                "Some of swa_start, swa_freq is None, ignoring other")
             # TODO: we can avoid swa_lr
-        for param in params[:-1]:
+        for param in params:
             if param is not None and not isinstance(param, int):
                 param = int(param)
                 warnings.warn("Casting swa_start, swa_freq to int")
@@ -46,7 +47,6 @@ class SWA(Optimizer):
             param_group['lr'] = self.swa_lr
 
     def update_swa(self):
-        print("Doing SWA Update")
         for group in self.param_groups:
             for p in group['params']:
                 param_state = self.state[p]
@@ -54,7 +54,6 @@ class SWA(Optimizer):
                     param_state['swa_buffer'] = torch.zeros_like(p.data)
                 buf = param_state['swa_buffer']
                 virtual_decay = 1 / (self.n_avg + 1)
-                #print("Virtual decay", virtual_decay)
                 diff = (p.data - buf) * virtual_decay
                 buf.add_(diff)
         self.n_avg += 1
@@ -73,7 +72,7 @@ class SWA(Optimizer):
     def step(self, closure=None):
         if self.auto_mode:
             swa_started = self.step_counter >= self.swa_start
-            if swa_started:
+            if swa_started and self.swa_lr is not None:
                 self._reset_lr_to_swa()
         loss = self.optimizer.step(closure)
         self.step_counter += 1

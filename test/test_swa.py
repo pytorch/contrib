@@ -257,27 +257,27 @@ class TestSWA(unittest.TestCase):
             return contriboptim.SWA(
                 adam, swa_start=1000, swa_freq=1, swa_lr=1e-3)
 
-        def adadelta_construcator(params):
-            adadelta = optim.Adadelta(params, lr=1e-2)
+        def adadelta_constructor(params):
+            adadelta = optim.Adadelta(params)
             return contriboptim.SWA(
-                adadelta, swa_start=1000, swa_freq=1, swa_lr=1e-3)
+                adadelta, swa_start=1000, swa_freq=1)
 
-        def adagrad_construcator(params):
-            adagrad = optim.Adagrad(params, lr=1e-2)
+        def adagrad_constructor(params):
+            adagrad = optim.Adagrad(params, lr=1e-1)
             return contriboptim.SWA(
-                adagrad, swa_start=1000, swa_freq=1, swa_lr=1e-3)
+                adagrad, swa_start=1000, swa_freq=1, swa_lr=1e-2)
 
-        def adamax_construcator(params):
-            adamax = optim.Adamax(params, lr=1e-2)
+        def adamax_constructor(params):
+            adamax = optim.Adamax(params, lr=1e-1)
             return contriboptim.SWA(
-                adamax, swa_start=1000, swa_freq=1, swa_lr=1e-3)
+                adamax, swa_start=1000, swa_freq=1, swa_lr=1e-2)
 
-        def rmsprop_construcator(params):
+        def rmsprop_constructor(params):
             rmsprop = optim.RMSprop(params, lr=1e-2)
             return contriboptim.SWA(
                 rmsprop, swa_start=1000, swa_freq=1, swa_lr=1e-3)
 
-        def rprop_construcator(params):
+        def rprop_constructor(params):
             rprop = optim.Rprop(params, lr=1e-2)
             return contriboptim.SWA(
                 rprop, swa_start=1000, swa_freq=1, swa_lr=1e-3)
@@ -292,11 +292,20 @@ class TestSWA(unittest.TestCase):
             return contriboptim.SWA(
                 lbfgs, swa_start=1000, swa_freq=1, swa_lr=1e-3)
 
-        self._test_rosenbrock(sgd_constructor)
+        auto_constructor_list = [sgd_constructor, sgd_momentum_constructor, 
+                                 adam_constructor, adadelta_constructor, 
+                                 adagrad_constructor, adamax_constructor, 
+                                 rmsprop_constructor, rprop_constructor,
+                                 asgd_constructor, lbfgs_constructor]
+
+        #auto_constructor_list = [adadelta_constructor]
+
+        for constructor in auto_constructor_list:
+            print(constructor)
+            # Pass
+            self._test_rosenbrock(constructor)
+
         self._test_rosenbrock(sgd_manual_constructor, automode=False)
-        self._test_rosenbrock(sgd_momentum_constructor)
-        self._test_rosenbrock(adam_constructor)
-        self._test_rosenbrock(lbfgs_constructor)
 
 
 if __name__ == '__main__':
