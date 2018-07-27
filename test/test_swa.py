@@ -257,10 +257,46 @@ class TestSWA(unittest.TestCase):
             return contriboptim.SWA(
                 adam, swa_start=1000, swa_freq=1, swa_lr=1e-3)
 
+        def adadelta_construcator(params):
+            adadelta = optim.Adadelta(params, lr=1e-2)
+            return contriboptim.SWA(
+                adadelta, swa_start=1000, swa_freq=1, swa_lr=1e-3)
+
+        def adagrad_construcator(params):
+            adagrad = optim.Adagrad(params, lr=1e-2)
+            return contriboptim.SWA(
+                adagrad, swa_start=1000, swa_freq=1, swa_lr=1e-3)
+
+        def adamax_construcator(params):
+            adamax = optim.Adamax(params, lr=1e-2)
+            return contriboptim.SWA(
+                adamax, swa_start=1000, swa_freq=1, swa_lr=1e-3)
+
+        def rmsprop_construcator(params):
+            rmsprop = optim.RMSprop(params, lr=1e-2)
+            return contriboptim.SWA(
+                rmsprop, swa_start=1000, swa_freq=1, swa_lr=1e-3)
+
+        def rprop_construcator(params):
+            rprop = optim.Rprop(params, lr=1e-2)
+            return contriboptim.SWA(
+                rprop, swa_start=1000, swa_freq=1, swa_lr=1e-3)
+
+        def asgd_constructor(params):
+            asgd = optim.ASGD(params, lr=1e-3)
+            return contriboptim.SWA(
+                asgd, swa_start=1000, swa_freq=1, swa_lr=1e-3)
+
+        def lbfgs_constructor(params):
+            lbfgs = optim.LBFGS(params, lr=5e-2, max_iter=5)
+            return contriboptim.SWA(
+                lbfgs, swa_start=1000, swa_freq=1, swa_lr=1e-3)
+
         self._test_rosenbrock(sgd_constructor)
         self._test_rosenbrock(sgd_manual_constructor, automode=False)
         self._test_rosenbrock(sgd_momentum_constructor)
         self._test_rosenbrock(adam_constructor)
+        self._test_rosenbrock(lbfgs_constructor)
 
 
 if __name__ == '__main__':
