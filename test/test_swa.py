@@ -29,8 +29,8 @@ class TestSWA(unittest.TestCase):
     # legacy-related parts and (2) add oprimizer.swap_swa_sgd() in the end of
     # optimization
 
-    def _test_rosenbrock(self, constructor):
-        #state = {}
+    def _test_rosenbrock(self, constructor, automode=True):
+        # automode shows wether we need to update SWA params manually
 
         params = Variable(torch.Tensor([1.5, 1.5]), requires_grad=True)
         optimizer = constructor([params])
@@ -54,6 +54,8 @@ class TestSWA(unittest.TestCase):
 
         for i in range(2000):
             optimizer.step(eval)
+            if not automode:
+                optimizer.update_swa()
         optimizer.swap_swa_sgd()
 
         self.assertLessEqual(params.data.dist(solution), initial_dist)
@@ -236,13 +238,29 @@ class TestSWA(unittest.TestCase):
     
     def test_swa(self):
         print("here")
-        def constructor(params):
+        def sgd_constructor(params):
             sgd = optim.SGD(params, lr=1e-3)
             return contriboptim.SWA(
                 sgd, swa_start=1000, swa_freq=1, swa_lr=1e-3)
-        self._test_rosenbrock(
-            constructor
-        )
+
+        def sgd_manual_constructor(params):
+            sgd = optim.SGD(params, lr=1e-3)
+            return contriboptim.SWA(sgd)
+
+        def sgd_momentum_constructor(params):
+            sgd = optim.SGD(params, lr=1e-3, momentum=0.9, weight_decay=1e-4)
+            return contriboptim.SWA(
+                sgd, swa_start=1000, swa_freq=1, swa_lr=1e-3)
+
+        def adam_constructor(params):
+            adam = optim.Adam(params, lr=1e-2)
+            return contriboptim.SWA(
+                adam, swa_start=1000, swa_freq=1, swa_lr=1e-3)
+
+        self._test_rosenbrock(sgd_constructor)
+        self._test_rosenbrock(sgd_manual_constructor, automode=False)
+        self._test_rosenbrock(sgd_momentum_constructor)
+        self._test_rosenbrock(adam_constructor)
 
 
 if __name__ == '__main__':

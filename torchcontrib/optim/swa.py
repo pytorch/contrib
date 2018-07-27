@@ -26,6 +26,8 @@ class SWA(Optimizer):
 
     @staticmethod
     def _check_params(self, swa_start, swa_freq, swa_lr):
+        # TODO: not raise error if swa_lr None
+        # TODO: raise error if negative swa_start, swa_freq
         params = [swa_start, swa_freq, swa_lr]
         params_none = [param is None for param in params]
         if not all(params_none) and any(params_none):
@@ -49,7 +51,7 @@ class SWA(Optimizer):
         for param_group in self.param_groups:
             param_group['lr'] = self.swa_lr
 
-    def swa_upd(self):
+    def update_swa(self):
         print("Doing SWA Update")
         for group in self.param_groups:
             for p in group['params']:
@@ -82,7 +84,7 @@ class SWA(Optimizer):
         if self.auto_mode:
             steps = self.step_counter
             if swa_started and steps % self.swa_freq == 0:
-                self.swa_upd()
+                self.update_swa()
         return loss
 
 # BatchNorm utils
