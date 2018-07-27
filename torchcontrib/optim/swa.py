@@ -1,3 +1,4 @@
+from collections import defaultdict
 from torch.optim import Optimizer
 import torch
 import warnings
@@ -18,8 +19,8 @@ class SWA(Optimizer):
 
         self.step_counter = 0
         self.param_groups = self.optimizer.param_groups
-        self.state = self.optimizer.state
-        self._make_shadow_vars()
+        self.state = defaultdict(dict)
+        self.state['opt_state'] = self.optimizer.state
 
         self.n_avg = 0
         self.state['n_avg'] = self.n_avg
@@ -40,13 +41,6 @@ class SWA(Optimizer):
                 warnings.warn("Casting swa_start, swa_freq to int")
         return not any(params_none), params
 
-    def _make_shadow_vars(self):
-        for group in self.param_groups:
-            for p in group['params']:
-                param_state = self.state[p]
-                if 'swa_buffer' not in param_state:
-                    param_state['swa_buffer'] = torch.zeros_like(p.data)
-
     def _reset_lr_to_swa(self):
         for param_group in self.param_groups:
             param_group['lr'] = self.swa_lr
@@ -56,6 +50,8 @@ class SWA(Optimizer):
         for group in self.param_groups:
             for p in group['params']:
                 param_state = self.state[p]
+                if 'swa_buffer' not in param_state:
+                    param_state['swa_buffer'] = torch.zeros_like(p.data)
                 buf = param_state['swa_buffer']
                 virtual_decay = 1 / (self.n_avg + 1)
                 #print("Virtual decay", virtual_decay)
