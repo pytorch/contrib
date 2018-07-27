@@ -84,6 +84,7 @@ class SWA(Optimizer):
         return loss
 
     def load_state_dict(self, state_dict):
+        # Need to load the optimizer state explicitly
         super(SWA, self).load_state_dict(state_dict)
         self.optimizer.state.update(self.state["opt_state"])
         self.state['opt_state'] = self.optimizer.state
