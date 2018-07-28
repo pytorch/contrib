@@ -1,8 +1,10 @@
 from collections import defaultdict
+from itertools import chain
 from torch.optim import Optimizer
 import torch
 import warnings
 
+#TODO: " -> ' or ' -> "
 class SWA(Optimizer):
     def __init__(self, optimizer, swa_start=None, swa_freq=None, swa_lr=None):
         r"""
@@ -18,13 +20,15 @@ class SWA(Optimizer):
         print('freq', self.swa_freq)
         print('lr', self.swa_lr)
 
-        self.step_counter = 0
+        # self.step_counter = 0
         self.param_groups = self.optimizer.param_groups
         self.state = defaultdict(dict)
-        self.state['opt_state'] = self.optimizer.state
+        #self.state['opt_state'] = self.optimizer.state
+        self.opt_state = self.optimizer.state
         #self.state['n_avg'] = 0
         for group in self.param_groups:
             group['n_avg'] = 0
+            group['step_counter'] = 0
 
     @staticmethod
     def _check_params(self, swa_start, swa_freq):
@@ -43,21 +47,26 @@ class SWA(Optimizer):
         return not any(params_none), params
 
     def _reset_lr_to_swa(self):
+        if self.swa_lr is None:
+            return
         for param_group in self.param_groups:
-            param_group['lr'] = self.swa_lr
+            if param_group['step_counter'] >= self.swa_start:
+                param_group['lr'] = self.swa_lr
+
+    def _update_swa_group(self, group):
+        for p in group['params']:
+            param_state = self.state[p]
+            if 'swa_buffer' not in param_state:
+                param_state['swa_buffer'] = torch.zeros_like(p.data)
+            buf = param_state['swa_buffer']
+            virtual_decay = 1 / (group["n_avg"] + 1)
+            diff = (p.data - buf) * virtual_decay
+            buf.add_(diff)
+        group["n_avg"] += 1
 
     def update_swa(self):
         for group in self.param_groups:
-            for p in group['params']:
-                param_state = self.state[p]
-                if 'swa_buffer' not in param_state:
-                    param_state['swa_buffer'] = torch.zeros_like(p.data)
-                buf = param_state['swa_buffer']
-                #virtual_decay = 1 / (self.state["n_avg"] + 1)
-                virtual_decay = 1 / (group["n_avg"] + 1)
-                diff = (p.data - buf) * virtual_decay
-                buf.add_(diff)
-        group["n_avg"] += 1
+            self._update_swa_group(group)
 
     def swap_swa_sgd(self):
         for group in self.param_groups:
@@ -71,24 +80,37 @@ class SWA(Optimizer):
                 #TODO: is it an ok way of doing this?
 
     def step(self, closure=None):
-        if self.auto_mode:
-            swa_started = self.step_counter >= self.swa_start
-            if swa_started and self.swa_lr is not None:
-                self._reset_lr_to_swa()
+        self._reset_lr_to_swa()
         loss = self.optimizer.step(closure)
-        self.step_counter += 1
-        if self.auto_mode:
-            steps = self.step_counter
-            if swa_started and steps % self.swa_freq == 0:
-                self.update_swa()
+        for group in self.param_groups:
+            group["step_counter"] += 1
+            steps = group["step_counter"]
+            if self.auto_mode:
+                if steps >= self.swa_start and steps % self.swa_freq == 0:
+                    self._update_swa_group(group)
         return loss
+
+    def state_dict(self):
+        opt_state_dict = self.optimizer.state_dict()
+        swa_state = {(id(k) if isinstance(k, torch.Tensor) else k): v
+                                for k, v in self.state.items()}
+        opt_state = opt_state_dict["state"]
+        param_groups = opt_state_dict["param_groups"]
+        return {"opt_state": opt_state, "swa_state": swa_state, 
+                "param_groups": param_groups}
+
+         
 
     def load_state_dict(self, state_dict):
         # Need to load the optimizer state explicitly
-        super(SWA, self).load_state_dict(state_dict)
-        self.optimizer.state.update(self.state["opt_state"])
-        self.state['opt_state'] = self.optimizer.state
-        self.param_groups = self.optimizer.param_groups
+        swa_state_dict = {"state": state_dict["swa_state"], 
+                          "param_groups": state_dict["param_groups"]}
+        opt_state_dict = {"state": state_dict["opt_state"], 
+                          "param_groups": state_dict["param_groups"]}
+        super(SWA, self).load_state_dict(swa_state_dict)
+        self.optimizer.load_state_dict(opt_state_dict)
+        #self.param_groups = self.optimizer.param_groups
+        self.opt_state = self.optimizer.state
 
 
 # BatchNorm utils
