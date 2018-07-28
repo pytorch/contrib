@@ -90,7 +90,7 @@ class SWA(Optimizer):
                 param_state = self.state[p]
                 if 'swa_buffer' not in param_state:
                     # If swa wasn't applied we don't swap params
-                    warings.warn(
+                    warnings.warn(
                         "SWA wasn't applied to param {}; skipping it".format(p))
                     continue
                 buf = param_state['swa_buffer']

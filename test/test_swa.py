@@ -156,10 +156,6 @@ class TestSWA(TestCase):
         state_dict = deepcopy(optimizer.state_dict())
         state_dict_c = deepcopy(optimizer.state_dict())
         optimizer_c.load_state_dict(state_dict_c)
-        print(optimizer.state_dict())
-        print(optimizer_c.state_dict())
-        print(optimizer.optimizer.state)
-        print(optimizer_c.optimizer.state)
         self.assertEqual(optimizer.optimizer.state_dict(), optimizer_c.optimizer.state_dict())
         # Run both optimizations in parallel
         for i in range(20):
@@ -167,6 +163,13 @@ class TestSWA(TestCase):
             optimizer_c.optimizer.step(fn_c)
             self.assertEqual(weight, weight_c)
             self.assertEqual(bias, bias_c)
+            # check that averages also coincide
+            optimizer.swap_swa_sgd()
+            optimizer_c.swap_swa_sgd()
+            self.assertEqual(weight, weight_c)
+            self.assertEqual(bias, bias_c)
+            optimizer.swap_swa_sgd()
+            optimizer_c.swap_swa_sgd()
         # Make sure state dict wasn't modified
         self.assertEqual(state_dict, state_dict_c)
 
@@ -258,9 +261,9 @@ class TestSWA(TestCase):
                 sgd, swa_start=1000, swa_freq=1, swa_lr=1e-3)
 
         def adam_constructor(params):
-            adam = optim.Adam(params, lr=1e-3)
+            adam = optim.Adam(params, lr=1e-2)
             return contriboptim.SWA(
-                adam, swa_start=1000, swa_freq=1, swa_lr=1e-3)
+                adam, swa_start=1000, swa_freq=1, swa_lr=1e-2)
 
         def adadelta_constructor(params):
             adadelta = optim.Adadelta(params)
@@ -303,105 +306,117 @@ class TestSWA(TestCase):
                                  rmsprop_constructor, rprop_constructor,
                                  asgd_constructor, lbfgs_constructor]
 
-        auto_constructor_list = [sgd_momentum_constructor]
+        #auto_constructor_list = [sgd_momentum_constructor]
 
-        for constructor in auto_constructor_list:
+        for i, constructor in enumerate(auto_constructor_list):
             print(constructor)
             # Pass
-            #self._test_rosenbrock(constructor)
+            self._test_rosenbrock(constructor)
             self._test_basic_cases(
                     lambda weight, bias: constructor([weight, bias]))
+            if i < len(auto_constructor_list) - 1:
+                self._test_basic_cases(
+                        lambda weight, bias: constructor(
+                            self._build_params_dict(weight, bias, lr=1e-2)))
+                self._test_basic_cases(
+                        lambda weight, bias: constructor(
+                            self._build_params_dict_single(weight, bias, lr=1e-2)))
+
 
         self._test_rosenbrock(sgd_manual_constructor, automode=False)
 
     def _define_vars_loss_opt(self):
-        x = Variable(torch.from_numpy(np.array([5., 2.])), requires_grad=True)
-        y = Variable(torch.from_numpy(np.array([3., 7.])), requires_grad=True)
+        x = Variable(torch.Tensor([5., 2.]), requires_grad=True)
+        y = Variable(torch.Tensor([3., 7.]), requires_grad=True)
 
         def loss_fun(a, b):
             return torch.sum(a * b)**2
 
         opt = optim.SGD([{'params': [x]},
                         {'params': [y], 'lr': 1e-3}], lr=1e-2, momentum=0.9)
-        return x, y, opt, loss_fun, opt
+        return x, y, loss_fun, opt
 
     def testSWAAuto(self):
         # Tests SWA in Auto mode: values of x and y after opt.swap_swa_sgd()
         # should be equal to the manually computed averages
-        x, y, loss, opt = self._define_vars_loss_opt
+        x, y, loss_fun, opt = self._define_vars_loss_opt()
         swa_start = 5
         swa_freq = 2
-        opt = SWA(opt, swa_start=swa_start, swa_freq=swa_freq, swa_lr=0.001)
+        opt = contriboptim.SWA(opt, swa_start=swa_start, swa_freq=swa_freq, swa_lr=0.001)
 
-	    x_sum = torch.zeros_like(x)
-		y_sum = torch.zeros_like(y)
-		n_avg = 0
-		for i in range(10):
-		    opt.zero_grad()
-		    loss = loss_fun(x, y)
-		    loss.backward()
-		    opt.step()
-		    if i % swa_freq == 0 and i >= swa_start:
-		        n_avg += 1
-		        x_sum += x.data
-		        y_sum += y.data
+        x_sum = torch.zeros_like(x)
+        y_sum = torch.zeros_like(y)
+        n_avg = 0
+        for i in range(1, 11):
+            opt.zero_grad()
+            loss = loss_fun(x, y)
+            loss.backward()
+            opt.step()
+            if i % swa_freq == 0 and i > swa_start:
+                n_avg += 1
+                x_sum += x.data
+                y_sum += y.data
 
-		opt.swap_swa_sgd()
-		x_avg = x_sum / n_avg
-		y_avg = y_sum / n_avg
-		self.assertEqual(x_avg, x)
-		self.assertEqual(y_avg, y)	
+        opt.swap_swa_sgd()
+        x_avg = x_sum / n_avg
+        y_avg = y_sum / n_avg
+        self.assertEqual(x_avg, x)
+        self.assertEqual(y_avg, y)      
 
     def testSWAManual(self):
         # Tests SWA in manual mode: values of x and y after opt.swap_swa_sgd()
         # should be equal to the manually computed averages
-        x, y, loss, opt = self._define_vars_loss_opt
-        opt = SWA(opt)
+        x, y, loss_fun, opt = self._define_vars_loss_opt()
+        opt = contriboptim.SWA(opt)
+        swa_start = 5
+        swa_freq = 2
 
-	    x_sum = torch.zeros_like(x)
-		y_sum = torch.zeros_like(y)
-		n_avg = 0
-		for i in range(10):
-		    opt.zero_grad()
-		    loss = loss_fun(x, y)
-		    loss.backward()
-		    opt.step()
-		    if i % swa_freq == 0 and i >= swa_start:
+        x_sum = torch.zeros_like(x)
+        y_sum = torch.zeros_like(y)
+        n_avg = 0
+        for i in range(1, 11):
+            opt.zero_grad()
+            loss = loss_fun(x, y)
+            loss.backward()
+            opt.step()
+            if i % swa_freq == 0 and i > swa_start:
                 opt.update_swa()
-		        n_avg += 1
-		        x_sum += x.data
-		        y_sum += y.data
+                n_avg += 1
+                x_sum += x.data
+                y_sum += y.data
 
-		opt.swap_swa_sgd()
-		x_avg = x_sum / n_avg
-		y_avg = y_sum / n_avg
-		self.assertEqual(x_avg, x)
-		self.assertEqual(y_avg, y)	
+        opt.swap_swa_sgd()
+        x_avg = x_sum / n_avg
+        y_avg = y_sum / n_avg
+        self.assertEqual(x_avg, x)
+        self.assertEqual(y_avg, y)      
 
     def testSWAManualGroup(self):
         # Tests SWA in manual mode with only y param group updated: 
         # value of x should not change after opt.swap_swa_sgd() and y should
         # be equal to the manually computed average
-        x, y, loss, opt = self._define_vars_loss_opt
-        opt = SWA(opt)
+        x, y, loss_fun, opt = self._define_vars_loss_opt()
+        opt = contriboptim.SWA(opt)
+        swa_start = 5
+        swa_freq = 2
 
-		y_sum = torch.zeros_like(y)
-		n_avg = 0
-		for i in range(10):
-		    opt.zero_grad()
-		    loss = loss_fun(x, y)
-		    loss.backward()
-		    opt.step()
-		    if i % swa_freq == 0 and i >= swa_start:
+        y_sum = torch.zeros_like(y)
+        n_avg = 0
+        for i in range(1, 11):
+            opt.zero_grad()
+            loss = loss_fun(x, y)
+            loss.backward()
+            opt.step()
+            if i % swa_freq == 0 and i > swa_start:
                 opt.update_swa_group(opt.param_groups[1])
-		        n_avg += 1
-		        y_sum += y.data
+                n_avg += 1
+                y_sum += y.data
 
         x_before_swap = x.data.clone()
-		opt.swap_swa_sgd()
-		y_avg = y_sum / n_avg
-		self.assertEqual(y_avg, y)	
-		self.assertEqual(x_before_swap, x)	
+        opt.swap_swa_sgd()
+        y_avg = y_sum / n_avg
+        self.assertEqual(y_avg, y)      
+        self.assertEqual(x_before_swap, x)      
 
     def testSWAAutoGroupAddedDuringRun(self):
         # Tests SWA in Auto mode with the second param group added after several
@@ -410,45 +425,50 @@ class TestSWA(TestCase):
         # For the first group averaging should start swa_start steps after the
         # first step of the optimizer.
 
-        x, y, loss, _ = self._define_vars_loss_opt
+        x, y, loss_fun, _ = self._define_vars_loss_opt()
         opt = optim.SGD([x], lr=1e-3, momentum=0.9)
         swa_start = 5
         swa_freq = 2
-        opt = SWA(opt, swa_start=swa_start, swa_freq=swa_freq, swa_lr=0.001)
+        opt = contriboptim.SWA(opt, swa_start=swa_start, swa_freq=swa_freq, swa_lr=0.001)
 
-	    x_sum = torch.zeros_like(x)
-		y_sum = torch.zeros_like(y)
-		x_n_avg = 0
-		y_n_avg = 0
+        x_sum = torch.zeros_like(x)
+        y_sum = torch.zeros_like(y)
+        x_n_avg = 0
+        y_n_avg = 0
         x_step = 0
-		for i in range(10):
-		    opt.zero_grad()
-		    loss = loss_fun(x, y)
-		    loss.backward()
-		    opt.step()
+        for i in range(1, 11):
+            opt.zero_grad()
+            loss = loss_fun(x, y)
+            loss.backward()
+            opt.step()
             x_step += 1
-		    if i % swa_freq == 0 and i >= swa_start:
-		        x_n_avg += 1
-		        x_sum += x.data
+            if i % swa_freq == 0 and i > swa_start:
+                x_n_avg += 1
+                x_sum += x.data
+        
+        x_avg = x_sum / x_n_avg
 
-		for y_step in range(10):
-		    opt.zero_grad()
-		    loss = loss_fun(x, y)
-		    loss.backward()
-		    opt.step()
-		    if y_step % swa_freq == 0 and y_step >= swa_start:
-		        y_n_avg += 1
-		        y_sum += y.data
-		    if x_step % swa_freq == 0 and x_step >= swa_start:
-		        x_n_avg += 1
-		        x_sum += x.data
+        opt.add_param_group({'params': y, 'lr':1e-4})
+
+        for y_step in range(1, 11):
+            opt.zero_grad()
+            loss = loss_fun(x, y)
+            loss.backward()
+            opt.step()
             x_step += 1
+            if y_step % swa_freq == 0 and y_step > swa_start:
+                y_n_avg += 1
+                y_sum += y.data
+            if x_step % swa_freq == 0 and x_step > swa_start:
+                x_n_avg += 1
+                x_sum += x.data
+                x_avg = x_sum / x_n_avg
 
-		opt.swap_swa_sgd()
-		x_avg = x_sum / x_n_avg
-		y_avg = y_sum / y_n_avg
-		self.assertEqual(x_avg, x)
-		self.assertEqual(y_avg, y)	
+        opt.swap_swa_sgd()
+        x_avg = x_sum / x_n_avg
+        y_avg = y_sum / y_n_avg
+        self.assertEqual(x_avg, x)
+        self.assertEqual(y_avg, y)      
         
     def testSWALR(self):
         # Tests SWA learning rate: in auto mode after swa_start steps the
@@ -456,35 +476,35 @@ class TestSWA(TestCase):
         # must be ignored
 
         # Auto mode
-        x, y, loss, opt = self._define_vars_loss_opt
+        x, y, loss_fun, opt = self._define_vars_loss_opt()
         swa_start = 5
         swa_freq = 2
         initial_lr = opt.param_groups[0]["lr"]
         swa_lr = initial_lr * 0.1
-        opt = SWA(opt, swa_start=swa_start, swa_freq=swa_freq, swa_lr=swa_lr)
+        opt = contriboptim.SWA(opt, swa_start=swa_start, swa_freq=swa_freq, swa_lr=swa_lr)
 
-		for i in range(10):
-		    opt.zero_grad()
-		    loss = loss_fun(x, y)
-		    loss.backward()
-		    opt.step()
+        for i in range(1, 11):
+            opt.zero_grad()
+            loss = loss_fun(x, y)
+            loss.backward()
+            opt.step()
             lr = opt.param_groups[0]["lr"]
-		    if i >= swa_start:
+            if i > swa_start:
                 self.assertEqual(lr, swa_lr)    
             else:
                 self.assertEqual(lr, initial_lr)    
 
         # Manual Mode
-        x, y, loss, opt = self._define_vars_loss_opt
+        x, y, loss, opt = self._define_vars_loss_opt()
         initial_lr = opt.param_groups[0]["lr"]
         swa_lr = initial_lr * 0.1
-        opt = SWA(opt, swa_lr=swa_lr)
+        opt = contriboptim.SWA(opt, swa_lr=swa_lr)
 
-		for i in range(10):
-		    opt.zero_grad()
-		    loss = loss_fun(x, y)
-		    loss.backward()
-		    opt.step()
+        for i in range(1, 11):
+            opt.zero_grad()
+            loss = loss_fun(x, y)
+            loss.backward()
+            opt.step()
             lr = opt.param_groups[0]["lr"]
             self.assertEqual(lr, initial_lr)    
 
@@ -493,49 +513,49 @@ class TestSWA(TestCase):
         # parameters provided
 
         # Auto mode
-        x, y, loss, base_opt = self._define_vars_loss_opt
+        x, y, loss_fun, base_opt = self._define_vars_loss_opt()
         swa_start = 5
         swa_freq = 2
         swa_lr = 0.001
 
-        opt = SWA(
+        opt = contriboptim.SWA(
             base_opt, swa_start=swa_start, swa_freq=swa_freq, swa_lr=swa_lr)
         self.assertEqual(opt._auto_mode, True)
 
-        opt = SWA(base_opt, swa_start=swa_start, swa_freq=swa_freq)
+        opt = contriboptim.SWA(base_opt, swa_start=swa_start, swa_freq=swa_freq)
         self.assertEqual(opt._auto_mode, True)
 
-        opt = SWA(base_opt, swa_start=swa_start, swa_lr=swa_lr)
+        opt = contriboptim.SWA(base_opt, swa_start=swa_start, swa_lr=swa_lr)
         self.assertEqual(opt._auto_mode, False)
 
-        opt = SWA(base_opt, swa_freq=swa_freq, swa_lr=swa_lr)
+        opt = contriboptim.SWA(base_opt, swa_freq=swa_freq, swa_lr=swa_lr)
         self.assertEqual(opt._auto_mode, False)
 
-        opt = SWA(base_opt, swa_start=swa_start)
+        opt = contriboptim.SWA(base_opt, swa_start=swa_start)
         self.assertEqual(opt._auto_mode, False)
 
-        opt = SWA(base_opt, swa_freq=swa_freq)
+        opt = contriboptim.SWA(base_opt, swa_freq=swa_freq)
         self.assertEqual(opt._auto_mode, False)
 
-        opt = SWA(base_opt, swa_lr=swa_lr)
+        opt = contriboptim.SWA(base_opt, swa_lr=swa_lr)
         self.assertEqual(opt._auto_mode, False)
 
     def testSWARaises(self):
         # Tests that SWA raises errors for wrong parameter values
 
-        x, y, loss, opt = self._define_vars_loss_opt
+        x, y, loss_fun, opt = self._define_vars_loss_opt()
         
         with self.assertRaisesRegex(
                 ValueError, "Invalid SWA learning rate: -0.0001"):
-            opt = SWA(opt, swa_start=1, swa_freq=2, swa_lr=-1e-4)
+            opt = contriboptim.SWA(opt, swa_start=1, swa_freq=2, swa_lr=-1e-4)
         
         with self.assertRaisesRegex(
                 ValueError, "Invalid swa_freq: 0"):
-            opt = SWA(opt, swa_start=1, swa_freq=0, swa_lr=1e-4)
+            opt = contriboptim.SWA(opt, swa_start=1, swa_freq=0, swa_lr=1e-4)
 
         with self.assertRaisesRegex(
                 ValueError, "Invalid swa_start: -1"):
-            opt = SWA(opt, swa_start=-1, swa_freq=0, swa_lr=1e-4)
+            opt = contriboptim.SWA(opt, swa_start=-1, swa_freq=0, swa_lr=1e-4)
 
 
 if __name__ == '__main__':
