@@ -314,6 +314,229 @@ class TestSWA(TestCase):
 
         self._test_rosenbrock(sgd_manual_constructor, automode=False)
 
+    def _define_vars_loss_opt(self):
+        x = Variable(torch.from_numpy(np.array([5., 2.])), requires_grad=True)
+        y = Variable(torch.from_numpy(np.array([3., 7.])), requires_grad=True)
+
+        def loss_fun(a, b):
+            return torch.sum(a * b)**2
+
+        opt = optim.SGD([{'params': [x]},
+                        {'params': [y], 'lr': 1e-3}], lr=1e-2, momentum=0.9)
+        return x, y, opt, loss_fun, opt
+
+    def testSWAAuto(self):
+        # Tests SWA in Auto mode: values of x and y after opt.swap_swa_sgd()
+        # should be equal to the manually computed averages
+        x, y, loss, opt = self._define_vars_loss_opt
+        swa_start = 5
+        swa_freq = 2
+        opt = SWA(opt, swa_start=swa_start, swa_freq=swa_freq, swa_lr=0.001)
+
+	    x_sum = torch.zeros_like(x)
+		y_sum = torch.zeros_like(y)
+		n_avg = 0
+		for i in range(10):
+		    opt.zero_grad()
+		    loss = loss_fun(x, y)
+		    loss.backward()
+		    opt.step()
+		    if i % swa_freq == 0 and i >= swa_start:
+		        n_avg += 1
+		        x_sum += x.data
+		        y_sum += y.data
+
+		opt.swap_swa_sgd()
+		x_avg = x_sum / n_avg
+		y_avg = y_sum / n_avg
+		self.assertEqual(x_avg, x)
+		self.assertEqual(y_avg, y)	
+
+    def testSWAManual(self):
+        # Tests SWA in manual mode: values of x and y after opt.swap_swa_sgd()
+        # should be equal to the manually computed averages
+        x, y, loss, opt = self._define_vars_loss_opt
+        opt = SWA(opt)
+
+	    x_sum = torch.zeros_like(x)
+		y_sum = torch.zeros_like(y)
+		n_avg = 0
+		for i in range(10):
+		    opt.zero_grad()
+		    loss = loss_fun(x, y)
+		    loss.backward()
+		    opt.step()
+		    if i % swa_freq == 0 and i >= swa_start:
+                opt.update_swa()
+		        n_avg += 1
+		        x_sum += x.data
+		        y_sum += y.data
+
+		opt.swap_swa_sgd()
+		x_avg = x_sum / n_avg
+		y_avg = y_sum / n_avg
+		self.assertEqual(x_avg, x)
+		self.assertEqual(y_avg, y)	
+
+    def testSWAManualGroup(self):
+        # Tests SWA in manual mode with only y param group updated: 
+        # value of x should not change after opt.swap_swa_sgd() and y should
+        # be equal to the manually computed average
+        x, y, loss, opt = self._define_vars_loss_opt
+        opt = SWA(opt)
+
+		y_sum = torch.zeros_like(y)
+		n_avg = 0
+		for i in range(10):
+		    opt.zero_grad()
+		    loss = loss_fun(x, y)
+		    loss.backward()
+		    opt.step()
+		    if i % swa_freq == 0 and i >= swa_start:
+                opt.update_swa_group(opt.param_groups[1])
+		        n_avg += 1
+		        y_sum += y.data
+
+        x_before_swap = x.data.clone()
+		opt.swap_swa_sgd()
+		y_avg = y_sum / n_avg
+		self.assertEqual(y_avg, y)	
+		self.assertEqual(x_before_swap, x)	
+
+    def testSWAAutoGroupAddedDuringRun(self):
+        # Tests SWA in Auto mode with the second param group added after several
+        # optimizations steps. The expected behavior is that the averaging for
+        # the second param group starts at swa_start steps after it is added. 
+        # For the first group averaging should start swa_start steps after the
+        # first step of the optimizer.
+
+        x, y, loss, _ = self._define_vars_loss_opt
+        opt = optim.SGD([x], lr=1e-3, momentum=0.9)
+        swa_start = 5
+        swa_freq = 2
+        opt = SWA(opt, swa_start=swa_start, swa_freq=swa_freq, swa_lr=0.001)
+
+	    x_sum = torch.zeros_like(x)
+		y_sum = torch.zeros_like(y)
+		x_n_avg = 0
+		y_n_avg = 0
+        x_step = 0
+		for i in range(10):
+		    opt.zero_grad()
+		    loss = loss_fun(x, y)
+		    loss.backward()
+		    opt.step()
+            x_step += 1
+		    if i % swa_freq == 0 and i >= swa_start:
+		        x_n_avg += 1
+		        x_sum += x.data
+
+		for y_step in range(10):
+		    opt.zero_grad()
+		    loss = loss_fun(x, y)
+		    loss.backward()
+		    opt.step()
+		    if y_step % swa_freq == 0 and y_step >= swa_start:
+		        y_n_avg += 1
+		        y_sum += y.data
+		    if x_step % swa_freq == 0 and x_step >= swa_start:
+		        x_n_avg += 1
+		        x_sum += x.data
+            x_step += 1
+
+		opt.swap_swa_sgd()
+		x_avg = x_sum / x_n_avg
+		y_avg = y_sum / y_n_avg
+		self.assertEqual(x_avg, x)
+		self.assertEqual(y_avg, y)	
+        
+    def testSWALR(self):
+        # Tests SWA learning rate: in auto mode after swa_start steps the
+        # learning rate should be changed to swa_lr; in manual mode swa_lr 
+        # must be ignored
+
+        # Auto mode
+        x, y, loss, opt = self._define_vars_loss_opt
+        swa_start = 5
+        swa_freq = 2
+        initial_lr = opt.param_groups[0]["lr"]
+        swa_lr = initial_lr * 0.1
+        opt = SWA(opt, swa_start=swa_start, swa_freq=swa_freq, swa_lr=swa_lr)
+
+		for i in range(10):
+		    opt.zero_grad()
+		    loss = loss_fun(x, y)
+		    loss.backward()
+		    opt.step()
+            lr = opt.param_groups[0]["lr"]
+		    if i >= swa_start:
+                self.assertEqual(lr, swa_lr)    
+            else:
+                self.assertEqual(lr, initial_lr)    
+
+        # Manual Mode
+        x, y, loss, opt = self._define_vars_loss_opt
+        initial_lr = opt.param_groups[0]["lr"]
+        swa_lr = initial_lr * 0.1
+        opt = SWA(opt, swa_lr=swa_lr)
+
+		for i in range(10):
+		    opt.zero_grad()
+		    loss = loss_fun(x, y)
+		    loss.backward()
+		    opt.step()
+            lr = opt.param_groups[0]["lr"]
+            self.assertEqual(lr, initial_lr)    
+
+    def testAutoMode(self):
+        # Tests that SWA mode (auto or manual) is chosen correctly based on
+        # parameters provided
+
+        # Auto mode
+        x, y, loss, base_opt = self._define_vars_loss_opt
+        swa_start = 5
+        swa_freq = 2
+        swa_lr = 0.001
+
+        opt = SWA(
+            base_opt, swa_start=swa_start, swa_freq=swa_freq, swa_lr=swa_lr)
+        self.assertEqual(opt._auto_mode, True)
+
+        opt = SWA(base_opt, swa_start=swa_start, swa_freq=swa_freq)
+        self.assertEqual(opt._auto_mode, True)
+
+        opt = SWA(base_opt, swa_start=swa_start, swa_lr=swa_lr)
+        self.assertEqual(opt._auto_mode, False)
+
+        opt = SWA(base_opt, swa_freq=swa_freq, swa_lr=swa_lr)
+        self.assertEqual(opt._auto_mode, False)
+
+        opt = SWA(base_opt, swa_start=swa_start)
+        self.assertEqual(opt._auto_mode, False)
+
+        opt = SWA(base_opt, swa_freq=swa_freq)
+        self.assertEqual(opt._auto_mode, False)
+
+        opt = SWA(base_opt, swa_lr=swa_lr)
+        self.assertEqual(opt._auto_mode, False)
+
+    def testSWARaises(self):
+        # Tests that SWA raises errors for wrong parameter values
+
+        x, y, loss, opt = self._define_vars_loss_opt
+        
+        with self.assertRaisesRegex(
+                ValueError, "Invalid SWA learning rate: -0.0001"):
+            opt = SWA(opt, swa_start=1, swa_freq=2, swa_lr=-1e-4)
+        
+        with self.assertRaisesRegex(
+                ValueError, "Invalid swa_freq: 0"):
+            opt = SWA(opt, swa_start=1, swa_freq=0, swa_lr=1e-4)
+
+        with self.assertRaisesRegex(
+                ValueError, "Invalid swa_start: -1"):
+            opt = SWA(opt, swa_start=-1, swa_freq=0, swa_lr=1e-4)
+
 
 if __name__ == '__main__':
     run_tests()

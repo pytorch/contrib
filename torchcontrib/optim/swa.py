@@ -10,9 +10,26 @@ class SWA(Optimizer):
         r"""
         swa_freq = None => call swa_upd manually
         """
-        self.auto_mode, (self.swa_start, self.swa_freq) = \
+        self._auto_mode, (self.swa_start, self.swa_freq) = \
                 self._check_params(self, swa_start, swa_freq)
         self.swa_lr = swa_lr
+
+        if self._auto_mode:
+            if swa_start < 0:
+                raise ValueError("Invalid swa_start: {}".format(swa_start))
+            if swa_freq < 1:
+                raise ValueError("Invalid swa_freq: {}".format(swa_freq))
+        else:
+            if self.swa_lr is not None:
+                warnings.warn(
+                    "Some of swa_start, swa_freq is None, ignoring swa_lr")
+            # If not in auto mode make all swa parameters None
+            self.swa_lr = None
+            self.swa_start = None
+            self.swa_freq = None
+
+        if self.swa_lr is not None and self.swa_lr < 0:
+            raise ValueError("Invalid SWA learning rate: {}".format(swa_lr))
 
         self.optimizer = optimizer
         print('SWA')
@@ -32,17 +49,16 @@ class SWA(Optimizer):
 
     @staticmethod
     def _check_params(self, swa_start, swa_freq):
-        # TODO: not raise error if swa_lr None
-        # TODO: raise error if negative swa_start, swa_freq
+            
         params = [swa_start, swa_freq]
         params_none = [param is None for param in params]
         if not all(params_none) and any(params_none):
             warnings.warn(
                 "Some of swa_start, swa_freq is None, ignoring other")
             # TODO: we can avoid swa_lr
-        for param in params:
+        for i, param in enumerate(params):
             if param is not None and not isinstance(param, int):
-                param = int(param)
+                params[i] = int(param)
                 warnings.warn("Casting swa_start, swa_freq to int")
         return not any(params_none), params
 
@@ -53,7 +69,7 @@ class SWA(Optimizer):
             if param_group['step_counter'] >= self.swa_start:
                 param_group['lr'] = self.swa_lr
 
-    def _update_swa_group(self, group):
+    def update_swa_group(self, group):
         for p in group['params']:
             param_state = self.state[p]
             if 'swa_buffer' not in param_state:
@@ -66,12 +82,15 @@ class SWA(Optimizer):
 
     def update_swa(self):
         for group in self.param_groups:
-            self._update_swa_group(group)
+            self.update_swa_group(group)
 
     def swap_swa_sgd(self):
         for group in self.param_groups:
             for p in group['params']:
                 param_state = self.state[p]
+                if 'swa_buffer' not in param_state:
+                    # If swa wasn't applied we don't swap params
+                    continue
                 buf = param_state['swa_buffer']
                 tmp = torch.empty_like(p.data)
                 tmp.copy_(p.data)
@@ -85,9 +104,9 @@ class SWA(Optimizer):
         for group in self.param_groups:
             group["step_counter"] += 1
             steps = group["step_counter"]
-            if self.auto_mode:
-                if steps >= self.swa_start and steps % self.swa_freq == 0:
-                    self._update_swa_group(group)
+            if self._auto_mode:
+                if steps > self.swa_start and steps % self.swa_freq == 0:
+                    self.update_swa_group(group)
         return loss
 
     def state_dict(self):
@@ -99,8 +118,6 @@ class SWA(Optimizer):
         return {"opt_state": opt_state, "swa_state": swa_state, 
                 "param_groups": param_groups}
 
-         
-
     def load_state_dict(self, state_dict):
         # Need to load the optimizer state explicitly
         swa_state_dict = {"state": state_dict["swa_state"], 
@@ -111,6 +128,11 @@ class SWA(Optimizer):
         self.optimizer.load_state_dict(opt_state_dict)
         #self.param_groups = self.optimizer.param_groups
         self.opt_state = self.optimizer.state
+
+    def add_param_group(self, param_group):
+        param_group['n_avg'] = 0
+        param_group['step_counter'] = 0
+        self.optimizer.add_param_group(param_group)
 
 
 # BatchNorm utils
