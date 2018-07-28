@@ -88,6 +88,7 @@ class SWA(Optimizer):
         super(SWA, self).load_state_dict(state_dict)
         self.optimizer.state.update(self.state["opt_state"])
         self.state['opt_state'] = self.optimizer.state
+        self.param_groups = self.optimizer.param_groups
 
 
 # BatchNorm utils

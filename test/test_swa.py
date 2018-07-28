@@ -1,4 +1,3 @@
-import unittest
 import functools
 from copy import deepcopy
 import torch
@@ -6,6 +5,7 @@ from torch.autograd import Variable
 from torch import sparse
 from torch import optim
 import torchcontrib.optim as contriboptim
+from common import TestCase, run_tests# TEST_WITH_UBSAN
 
 
 def rosenbrock(tensor):
@@ -24,7 +24,7 @@ def wrap_old_fn(old_fn, **config):
     return wrapper
 
 
-class TestSWA(unittest.TestCase):
+class TestSWA(TestCase):
     # Pavel: I slightly update the _test_... functions to (1) remove the
     # legacy-related parts and (2) add oprimizer.swap_swa_sgd() in the end of
     # optimization
@@ -156,10 +156,15 @@ class TestSWA(unittest.TestCase):
         state_dict = deepcopy(optimizer.state_dict())
         state_dict_c = deepcopy(optimizer.state_dict())
         optimizer_c.load_state_dict(state_dict_c)
+        print(optimizer.state_dict())
+        print(optimizer_c.state_dict())
+        print(optimizer.optimizer.state)
+        print(optimizer_c.optimizer.state)
+        self.assertEqual(optimizer.optimizer.state_dict(), optimizer_c.optimizer.state_dict())
         # Run both optimizations in parallel
         for i in range(20):
-            optimizer.step(fn)
-            optimizer_c.step(fn_c)
+            optimizer.optimizer.step(fn)
+            optimizer_c.optimizer.step(fn_c)
             self.assertEqual(weight, weight_c)
             self.assertEqual(bias, bias_c)
         # Make sure state dict wasn't modified
@@ -253,7 +258,7 @@ class TestSWA(unittest.TestCase):
                 sgd, swa_start=1000, swa_freq=1, swa_lr=1e-3)
 
         def adam_constructor(params):
-            adam = optim.Adam(params, lr=1e-2)
+            adam = optim.Adam(params, lr=1e-3)
             return contriboptim.SWA(
                 adam, swa_start=1000, swa_freq=1, swa_lr=1e-3)
 
@@ -298,15 +303,17 @@ class TestSWA(unittest.TestCase):
                                  rmsprop_constructor, rprop_constructor,
                                  asgd_constructor, lbfgs_constructor]
 
-        #auto_constructor_list = [adadelta_constructor]
+        auto_constructor_list = [sgd_momentum_constructor]
 
         for constructor in auto_constructor_list:
             print(constructor)
             # Pass
-            self._test_rosenbrock(constructor)
+            #self._test_rosenbrock(constructor)
+            self._test_basic_cases(
+                    lambda weight, bias: constructor([weight, bias]))
 
         self._test_rosenbrock(sgd_manual_constructor, automode=False)
 
 
 if __name__ == '__main__':
-    unittest.main()
+    run_tests()
