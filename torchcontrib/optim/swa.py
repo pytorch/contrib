@@ -5,6 +5,7 @@ import torch
 import warnings
 
 #TODO: " -> ' or ' -> "
+#TODO: use :meth: everywhere in docstrings?
 class SWA(Optimizer):
     def __init__(self, optimizer, swa_start=None, swa_freq=None, swa_lr=None):
         r"""
@@ -135,6 +136,28 @@ class SWA(Optimizer):
                 param_group['lr'] = self.swa_lr
 
     def update_swa_group(self, group):
+        r"""
+        Updates the SWA running averages of all optimized parameters in the
+        given parameter group. 
+
+		Arguments:
+		    param_group (dict): Specifies for what parameter group SWA runninh 
+                averages should be updated;
+
+        Examples::
+            >>> # automatic mode
+            >>> base_opt = torch.optim.SGD([{'params': [x]},
+            >>>             {'params': [y], 'lr': 1e-3}], lr=1e-2, momentum=0.9)
+            >>> opt = torchcontrib.optim.SWA(base_opt)
+            >>> for i in range(100):
+            >>>     opt.zero_grad()
+            >>>     loss_fn(model(input), target).backward()
+            >>>     opt.step()
+            >>>     if i > 10 and i % 5 == 0:
+            >>>         # Update SWA for the second parameter group
+            >>>         opt.update_swa_group(opt.param_groups[1])
+            >>> opt.swap_swa_sgd()
+        """
         for p in group['params']:
             param_state = self.state[p]
             if 'swa_buffer' not in param_state:
@@ -146,10 +169,21 @@ class SWA(Optimizer):
         group["n_avg"] += 1
 
     def update_swa(self):
+        r"""
+        Updates the SWA running averages of all optimized parameters. 
+        """
         for group in self.param_groups:
             self.update_swa_group(group)
 
     def swap_swa_sgd(self):
+		r"""
+		Swaps the values of the optimized variables and swa_buffers.
+
+		It's meant to be called in the end of training to use the collected
+        swa running averages. It can also be used to evaluate the running 
+        averages during training; to continue training :meth:`swap_swa_sgd`
+        should be called again.
+		"""
         for group in self.param_groups:
             for p in group['params']:
                 param_state = self.state[p]
@@ -166,6 +200,10 @@ class SWA(Optimizer):
                 #TODO: is it an ok way of doing this?
 
     def step(self, closure=None):
+        r"""
+        Performs a single optimization step. In automatic mode also updates SWA
+        running averages.
+        """
         self._reset_lr_to_swa()
         loss = self.optimizer.step(closure)
         for group in self.param_groups:
@@ -177,6 +215,17 @@ class SWA(Optimizer):
         return loss
 
     def state_dict(self):
+        r"""
+        Returns the state of SWA as a :class:`dict`.
+
+        It contains three entries:
+            * opt_state - a dict holding current optimization state of the base
+                optimizer. Its content differs between optimizer classes.
+            * swa_state - a dict containing current state of SWA. For each 
+                optimized variable it contains swa_buffer keeping the running 
+                average of the variable
+            * param_groups - a dict containing all parameter groups
+        """
         opt_state_dict = self.optimizer.state_dict()
         swa_state = {(id(k) if isinstance(k, torch.Tensor) else k): v
                                 for k, v in self.state.items()}
@@ -186,17 +235,32 @@ class SWA(Optimizer):
                 "param_groups": param_groups}
 
     def load_state_dict(self, state_dict):
-        # Need to load the optimizer state explicitly
+        r"""
+        Loads the optimizer state.
+        
+        Arguments:
+            state_dict (dict): SWA optimizer state. Should be an object returned
+                from a call to :meth:`state_dict`.
+        """
         swa_state_dict = {"state": state_dict["swa_state"], 
                           "param_groups": state_dict["param_groups"]}
         opt_state_dict = {"state": state_dict["opt_state"], 
                           "param_groups": state_dict["param_groups"]}
         super(SWA, self).load_state_dict(swa_state_dict)
         self.optimizer.load_state_dict(opt_state_dict)
-        #self.param_groups = self.optimizer.param_groups
         self.opt_state = self.optimizer.state
 
     def add_param_group(self, param_group):
+        r"""
+		Add a param group to the :class:`Optimizer` s `param_groups`.
+		
+		This can be useful when fine tuning a pre-trained network as frozen layers can be made
+		trainable and added to the :class:`Optimizer` as training progresses.
+		
+		Arguments:
+		    param_group (dict): Specifies what Tensors should be optimized along with group
+		    specific optimization options.
+        """
         param_group['n_avg'] = 0
         param_group['step_counter'] = 0
         self.optimizer.add_param_group(param_group)
