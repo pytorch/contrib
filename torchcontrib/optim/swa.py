@@ -311,13 +311,17 @@ def bn_update(loader, model, cuda=True):
     """
     if not _check_bn(model):
         return
-    # TODO: check if was eval?
+	was_eval = model.training == False
     model.train()
     momenta = {}
     model.apply(_reset_bn)
     model.apply(lambda module: _get_momenta(module, momenta))
     n = 0
-    for input, _ in loader:
+    for input in loader:
+        try:
+            input, _ = input
+        except:
+            pass
         if cuda:
             #TODO: what is async?
             input = input.cuda(async=True)
@@ -332,3 +336,5 @@ def bn_update(loader, model, cuda=True):
         n += b
 
     model.apply(lambda module: _set_momenta(module, momenta))
+    if was_eval:
+        model.eval()
