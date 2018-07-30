@@ -9,23 +9,23 @@ class SWA(Optimizer):
     def __init__(self, optimizer, swa_start=None, swa_freq=None, swa_lr=None):
         r"""Implements Stochastic Weight Averaging (SWA).
 
-        SWA was proposed in `Averaging Weights Leads to Wider Optima and Better
-        Generalization`_.
+        Stochastic Weight Averaging was proposed in `Averaging Weights Leads to 
+        Wider Optima and Better Generalization`_.
 
-        SWA is implemented as a wrapper-class taking optimizer instance as input
+        SWA is implemented as a wrapper class taking optimizer instance as input
         and applying SWA on top of that optimizer. 
         
         SWA can be used in two modes: automatic and manual. In the automatic 
-        mode SWA running averages are automatically updated every swa_freq 
-        steps after swa_start steps of optimization. If swa_lr is provided, 
-        the learning rate of the optimizer is reset to swa_lr at every step 
-        starting from swa_start. To use SWA in automatic mode provide values
-        for both swa_start and swa_freq arguments. 
+        mode SWA running averages are automatically updated every `swa_freq` 
+        steps after `swa_start` steps of optimization. If `swa_lr` is provided, 
+        the learning rate of the optimizer is reset to `swa_lr` at every step 
+        starting from `swa_start`. To use SWA in automatic mode provide values
+        for both `swa_start` and `swa_freq` arguments. 
 
-        Alternatively, in the manual mode use  update_swa or 
-        update_swa_group methods to update the SWA running averages. 
+        Alternatively, in the manual mode use `update_swa` or 
+        `update_swa_group` methods to update the SWA running averages. 
 
-        In the end of training use swap_swa_sgd method to set the optimized 
+        In the end of training use `swap_swa_sgd` method to set the optimized 
         variables to the computed averages.
 
         Args:
@@ -60,22 +60,22 @@ class SWA(Optimizer):
             >>> opt.swap_swa_sgd()
 
         .. note::
-            SWA does not support parameter-specific values of swa_start, 
-            swa_freq or swa_lr. In automatic mode SWA uses the same 
-            swa_start, swa_freq and swa_lr for all parameter groups.
-            If needed, use manual mode with update_swa_group to use different 
+            SWA does not support parameter-specific values of `swa_start`, 
+            `swa_freq` or `swa_lr`. In automatic mode SWA uses the same 
+            `swa_start`, `swa_freq` and `swa_lr` for all parameter groups.
+            If needed, use manual mode with `update_swa_group` to use different 
             update schedules for different parameter groups.
 
         .. note::
-            swap_swa_sgd in the end of training to use the computed running
-            averages.
+            Call `swap_swa_sgd` in the end of training to use the computed 
+            running averages.
 
         .. note::
             If you are using SWA to optimize the parameters of a Neural Network
             containing Batch Normalization, you need to update the 
-            running_mean and running_var statistics of the Bathc 
-            Normalization module. You can do so by using 
-            torchcontrib.optim.swa.bn_update utility.
+            `running_mean` and `running_var` statistics of the 
+            Batch Normalization module. You can do so by using 
+            `torchcontrib.optim.swa.bn_update` utility.
 
         .. _Averaging Weights Leads to Wider Optima and Better Generalization:
             https://arxiv.org/abs/1803.05407
@@ -121,7 +121,6 @@ class SWA(Optimizer):
         if not all(params_none) and any(params_none):
             warnings.warn(
                 "Some of swa_start, swa_freq is None, ignoring other")
-            # TODO: we can avoid swa_lr
         for i, param in enumerate(params):
             if param is not None and not isinstance(param, int):
                 params[i] = int(param)
@@ -173,11 +172,11 @@ class SWA(Optimizer):
             self.update_swa_group(group)
 
     def swap_swa_sgd(self):
-        r"""Swaps the values of the optimized variables and swa_buffers.
+        r"""Swaps the values of the optimized variables and swa buffers.
 
         It's meant to be called in the end of training to use the collected
         swa running averages. It can also be used to evaluate the running 
-        averages during training; to continue training swap_swa_sgd
+        averages during training; to continue training `swap_swa_sgd`
         should be called again.
         """
         for group in self.param_groups:
