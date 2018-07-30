@@ -140,8 +140,8 @@ class SWA(Optimizer):
         Updates the SWA running averages of all optimized parameters in the
         given parameter group. 
 
-		Arguments:
-		    param_group (dict): Specifies for what parameter group SWA runninh 
+                Arguments:
+                    param_group (dict): Specifies for what parameter group SWA runninh 
                 averages should be updated;
 
         Examples::
@@ -176,14 +176,14 @@ class SWA(Optimizer):
             self.update_swa_group(group)
 
     def swap_swa_sgd(self):
-		r"""
-		Swaps the values of the optimized variables and swa_buffers.
+        r"""
+        Swaps the values of the optimized variables and swa_buffers.
 
-		It's meant to be called in the end of training to use the collected
+        It's meant to be called in the end of training to use the collected
         swa running averages. It can also be used to evaluate the running 
         averages during training; to continue training :meth:`swap_swa_sgd`
         should be called again.
-		"""
+        """
         for group in self.param_groups:
             for p in group['params']:
                 param_state = self.state[p]
@@ -252,14 +252,14 @@ class SWA(Optimizer):
 
     def add_param_group(self, param_group):
         r"""
-		Add a param group to the :class:`Optimizer` s `param_groups`.
-		
-		This can be useful when fine tuning a pre-trained network as frozen layers can be made
-		trainable and added to the :class:`Optimizer` as training progresses.
-		
-		Arguments:
-		    param_group (dict): Specifies what Tensors should be optimized along with group
-		    specific optimization options.
+        Add a param group to the :class:`Optimizer` s `param_groups`.
+        
+        This can be useful when fine tuning a pre-trained network as frozen layers can be made
+        trainable and added to the :class:`Optimizer` as training progresses.
+        
+        Arguments:
+            param_group (dict): Specifies what Tensors should be optimized along with group
+            specific optimization options.
         """
         param_group['n_avg'] = 0
         param_group['step_counter'] = 0
@@ -308,20 +308,18 @@ def bn_update(loader, model, cuda=True):
 
         model (torch.nn.Module): model for which we seek to update BatchNorm 
             statistics.
+
+        cuda (bool): whether to use apply :meth:`.cuda` to the elements of the 
+            dataloader.
     """
     if not _check_bn(model):
         return
-	was_eval = model.training == False
+    was_eval = model.training == False
     model.train()
     momenta = {}
     model.apply(_reset_bn)
     model.apply(lambda module: _get_momenta(module, momenta))
     n = 0
-<<<<<<< HEAD
-    for input, _ in loader:
-        # TODO: check if CUDA availible
-        input = input.cuda(async=True)
-=======
     for input in loader:
         try:
             input, _ = input
@@ -330,7 +328,6 @@ def bn_update(loader, model, cuda=True):
         if cuda:
             #TODO: what is async?
             input = input.cuda(async=True)
->>>>>>> 4f6da1a54b3b8d42d2e47e1c393d4a04626935d1
         input_var = torch.autograd.Variable(input)
         b = input_var.data.size(0)
 

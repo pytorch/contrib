@@ -1,1 +1,1 @@
-from .swa import SWA
+from .swa import SWA, bn_update
