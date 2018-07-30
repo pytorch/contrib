@@ -295,14 +295,19 @@ def _set_momenta(module, momenta):
 
 
 def bn_update(loader, model, cuda=True):
-    #TODO: fix this docstring
     r"""
-        BatchNorm buffers update (if any).
-        Performs 1 epochs to estimate buffers average using train dataset.
+    Updates BatchNorm running_mean and running_var buffers in the model if any.
 
-        :param loader: train dataset loader for buffers average estimation.
-        :param model: model being update
-        :return: None
+    It performs 1 pass over data in `loader` to estimate the activation statistics
+    for BatchNorm layers in the model.
+
+    Arguments:
+
+        loader (torch.utils.data.DataLoader): dataset loader to compute the
+            activation statistics on.
+
+        model (torch.nn.Module): model for which we seek to update BatchNorm 
+            statistics.
     """
     if not _check_bn(model):
         return
