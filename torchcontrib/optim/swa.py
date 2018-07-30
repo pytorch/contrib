@@ -5,11 +5,9 @@ import torch
 import warnings
 
 #TODO: " -> ' or ' -> "
-#TODO: use :meth: everywhere in docstrings?
 class SWA(Optimizer):
     def __init__(self, optimizer, swa_start=None, swa_freq=None, swa_lr=None):
-        r"""
-        Implements Stochastic Weight Averaging (SWA).
+        r"""Implements Stochastic Weight Averaging (SWA).
 
         SWA was proposed in `Averaging Weights Leads to Wider Optima and Better
         Generalization`_.
@@ -41,10 +39,11 @@ class SWA(Optimizer):
                 in automatic mode; if None, learning rate is not changed
                 (default: None)
 
-        Examples::
+        Examples:
             >>> # automatic mode
-            >>> base_opt = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
-            >>> opt = torchcontrib.optim.SWA(base_opt, swa_start=10, swa_freq=5, swa_lr=0.05)
+            >>> base_opt = torch.optim.SGD(model.parameters(), lr=0.1)
+            >>> opt = torchcontrib.optim.SWA( 
+            >>>                 base_opt, swa_start=10, swa_freq=5, swa_lr=0.05)
             >>> for _ in range(100):
             >>>     opt.zero_grad()
             >>>     loss_fn(model(input), target).backward()
@@ -78,10 +77,11 @@ class SWA(Optimizer):
             Normalization module. You can do so by using 
             torchcontrib.optim.swa.bn_update utility.
 
-        .. _Averaging Weights ...:
-            https://arxiv.org/abs/...
-        .. _Improving ...:
-            https://arxiv.org/abs/...
+        .. _Averaging Weights Leads to Wider Optima and Better Generalization:
+            https://arxiv.org/abs/1803.05407
+        .. _Improving Consistency-Based Semi-Supervised Learning with Weight 
+            Averaging:
+            https://arxiv.org/abs/1806.05594
         """
         self._auto_mode, (self.swa_start, self.swa_freq) = \
                 self._check_params(self, swa_start, swa_freq)
@@ -136,15 +136,13 @@ class SWA(Optimizer):
                 param_group['lr'] = self.swa_lr
 
     def update_swa_group(self, group):
-        r"""
-        Updates the SWA running averages of all optimized parameters in the
-        given parameter group. 
+        r"""Updates the SWA running averagesfor the given parameter group. 
 
-                Arguments:
-                    param_group (dict): Specifies for what parameter group SWA runninh 
-                averages should be updated;
+        Arguments:
+            param_group (dict): Specifies for what parameter group SWA running
+                averages should be updated
 
-        Examples::
+        Examples:
             >>> # automatic mode
             >>> base_opt = torch.optim.SGD([{'params': [x]},
             >>>             {'params': [y], 'lr': 1e-3}], lr=1e-2, momentum=0.9)
@@ -169,19 +167,17 @@ class SWA(Optimizer):
         group["n_avg"] += 1
 
     def update_swa(self):
-        r"""
-        Updates the SWA running averages of all optimized parameters. 
+        r"""Updates the SWA running averages of all optimized parameters. 
         """
         for group in self.param_groups:
             self.update_swa_group(group)
 
     def swap_swa_sgd(self):
-        r"""
-        Swaps the values of the optimized variables and swa_buffers.
+        r"""Swaps the values of the optimized variables and swa_buffers.
 
         It's meant to be called in the end of training to use the collected
         swa running averages. It can also be used to evaluate the running 
-        averages during training; to continue training :meth:`swap_swa_sgd`
+        averages during training; to continue training swap_swa_sgd
         should be called again.
         """
         for group in self.param_groups:
@@ -197,12 +193,11 @@ class SWA(Optimizer):
                 tmp.copy_(p.data)
                 p.data.copy_(buf)
                 buf.copy_(tmp)
-                #TODO: is it an ok way of doing this?
 
     def step(self, closure=None):
-        r"""
-        Performs a single optimization step. In automatic mode also updates SWA
-        running averages.
+        r"""Performs a single optimization step. 
+        
+        In automatic mode also updates SWA running averages.
         """
         self._reset_lr_to_swa()
         loss = self.optimizer.step(closure)
@@ -215,8 +210,7 @@ class SWA(Optimizer):
         return loss
 
     def state_dict(self):
-        r"""
-        Returns the state of SWA as a :class:`dict`.
+        r"""Returns the state of SWA as a :class:`dict`.
 
         It contains three entries:
             * opt_state - a dict holding current optimization state of the base
@@ -235,12 +229,11 @@ class SWA(Optimizer):
                 "param_groups": param_groups}
 
     def load_state_dict(self, state_dict):
-        r"""
-        Loads the optimizer state.
+        r"""Loads the optimizer state.
         
-        Arguments:
+        Args:
             state_dict (dict): SWA optimizer state. Should be an object returned
-                from a call to :meth:`state_dict`.
+                from a call to `state_dict`.
         """
         swa_state_dict = {"state": state_dict["swa_state"], 
                           "param_groups": state_dict["param_groups"]}
@@ -251,15 +244,15 @@ class SWA(Optimizer):
         self.opt_state = self.optimizer.state
 
     def add_param_group(self, param_group):
-        r"""
-        Add a param group to the :class:`Optimizer` s `param_groups`.
+        r"""Add a param group to the :class:`Optimizer` s `param_groups`.
         
-        This can be useful when fine tuning a pre-trained network as frozen layers can be made
-        trainable and added to the :class:`Optimizer` as training progresses.
+        This can be useful when fine tuning a pre-trained network as frozen 
+        layers can be made trainable and added to the :class:`Optimizer` as 
+        training progresses.
         
-        Arguments:
-            param_group (dict): Specifies what Tensors should be optimized along with group
-            specific optimization options.
+        Args:
+            param_group (dict): Specifies what Tensors should be optimized along
+            with group specific optimization options.
         """
         param_group['n_avg'] = 0
         param_group['step_counter'] = 0
@@ -295,21 +288,19 @@ def _set_momenta(module, momenta):
 
 
 def bn_update(loader, model, cuda=True):
-    r"""
-    Updates BatchNorm running_mean and running_var buffers in the model if any.
+    r"""Updates BatchNorm running_mean, running_var buffers in the model if any.
 
-    It performs 1 pass over data in `loader` to estimate the activation statistics
-    for BatchNorm layers in the model.
+    It performs 1 pass over data in `loader` to estimate the activation 
+    statistics for BatchNorm layers in the model.
 
-    Arguments:
-
+    Args:
         loader (torch.utils.data.DataLoader): dataset loader to compute the
             activation statistics on.
 
         model (torch.nn.Module): model for which we seek to update BatchNorm 
             statistics.
 
-        cuda (bool): whether to use apply :meth:`.cuda` to the elements of the 
+        cuda (bool): whether to use apply `.cuda` to the elements of the 
             dataloader.
     """
     if not _check_bn(model):
@@ -326,7 +317,6 @@ def bn_update(loader, model, cuda=True):
         except:
             pass
         if cuda:
-            #TODO: what is async?
             input = input.cuda(async=True)
         input_var = torch.autograd.Variable(input)
         b = input_var.data.size(0)
