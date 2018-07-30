@@ -183,6 +183,7 @@ def bn_update(loader, model):
     model.apply(lambda module: _get_momenta(module, momenta))
     n = 0
     for input, _ in loader:
+        # TODO: check if CUDA availible
         input = input.cuda(async=True)
         input_var = torch.autograd.Variable(input)
         b = input_var.data.size(0)

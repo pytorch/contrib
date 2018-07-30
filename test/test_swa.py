@@ -6,6 +6,7 @@ from torch import sparse
 from torch import optim
 import torchcontrib.optim as contriboptim
 from common import TestCase, run_tests# TEST_WITH_UBSAN
+from torch.utils import data
 
 
 def rosenbrock(tensor):
@@ -556,6 +557,12 @@ class TestSWA(TestCase):
         with self.assertRaisesRegex(
                 ValueError, "Invalid swa_start: -1"):
             opt = contriboptim.SWA(opt, swa_start=-1, swa_freq=0, swa_lr=1e-4)
+
+    def testBNUpdate(self):
+        # Tests bn_update function by creating a small dataset and network and
+        # testing that the manually computed activation statistics are the same
+        # as those computed by bn_update
+        
 
 
 if __name__ == '__main__':
