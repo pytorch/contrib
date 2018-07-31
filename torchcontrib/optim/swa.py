@@ -4,7 +4,6 @@ from torch.optim import Optimizer
 import torch
 import warnings
 
-#TODO: " -> ' or ' -> "
 class SWA(Optimizer):
     def __init__(self, optimizer, swa_start=None, swa_freq=None, swa_lr=None):
         r"""Implements Stochastic Weight Averaging (SWA).
