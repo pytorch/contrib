@@ -302,6 +302,7 @@ class SWA(Optimizer):
         if was_eval:
             model.eval()
 
+
 # BatchNorm utils
 def _check_bn_apply(module, flag):
     if issubclass(module.__class__, torch.nn.modules.batchnorm._BatchNorm):
