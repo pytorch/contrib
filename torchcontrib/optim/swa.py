@@ -255,13 +255,58 @@ class SWA(Optimizer):
         param_group['n_avg'] = 0
         param_group['step_counter'] = 0
         self.optimizer.add_param_group(param_group)
-
+    
+    @staticmethod
+    def bn_update(loader, model, cuda=True):
+        r"""Updates BatchNorm running_mean, running_var buffers in the model.
+    
+        It performs 1 pass over data in `loader` to estimate the activation 
+        statistics for BatchNorm layers in the model.
+    
+        Args:
+            loader (torch.utils.data.DataLoader): dataset loader to compute the
+                activation statistics on.
+    
+            model (torch.nn.Module): model for which we seek to update BatchNorm
+                statistics.
+    
+            cuda (bool): whether to use apply `.cuda` to the elements of the 
+                dataloader.
+        """
+        if not _check_bn(model):
+            return
+        was_eval = model.training == False
+        model.train()
+        momenta = {}
+        model.apply(_reset_bn)
+        model.apply(lambda module: _get_momenta(module, momenta))
+        n = 0
+        for input in loader:
+            try:
+                input, _ = input
+            except:
+                pass
+            if cuda:
+                input = input.cuda(async=True)
+            input_var = torch.autograd.Variable(input)
+            b = input_var.data.size(0)
+    
+            momentum = b / (n + b)
+            for module in momenta.keys():
+                module.momentum = momentum
+    
+            model(input_var)
+            n += b
+    
+        model.apply(lambda module: _set_momenta(module, momenta))
+        if was_eval:
+            model.eval()
 
 # BatchNorm utils
-
 def _check_bn_apply(module, flag):
     if issubclass(module.__class__, torch.nn.modules.batchnorm._BatchNorm):
         flag[0] = True
+
 
 def _check_bn(model):
     flag = [False]
@@ -283,49 +328,3 @@ def _get_momenta(module, momenta):
 def _set_momenta(module, momenta):
     if issubclass(module.__class__, torch.nn.modules.batchnorm._BatchNorm):
         module.momentum = momenta[module]
-
-
-def bn_update(loader, model, cuda=True):
-    r"""Updates BatchNorm running_mean, running_var buffers in the model if any.
-
-    It performs 1 pass over data in `loader` to estimate the activation 
-    statistics for BatchNorm layers in the model.
-
-    Args:
-        loader (torch.utils.data.DataLoader): dataset loader to compute the
-            activation statistics on.
-
-        model (torch.nn.Module): model for which we seek to update BatchNorm 
-            statistics.
-
-        cuda (bool): whether to use apply `.cuda` to the elements of the 
-            dataloader.
-    """
-    if not _check_bn(model):
-        return
-    was_eval = model.training == False
-    model.train()
-    momenta = {}
-    model.apply(_reset_bn)
-    model.apply(lambda module: _get_momenta(module, momenta))
-    n = 0
-    for input in loader:
-        try:
-            input, _ = input
-        except:
-            pass
-        if cuda:
-            input = input.cuda(async=True)
-        input_var = torch.autograd.Variable(input)
-        b = input_var.data.size(0)
-
-        momentum = b / (n + b)
-        for module in momenta.keys():
-            module.momentum = momentum
-
-        model(input_var)
-        n += b
-
-    model.apply(lambda module: _set_momenta(module, momenta))
-    if was_eval:
-        model.eval()

@@ -606,7 +606,8 @@ class TestSWA(TestCase):
         preactivation_var = preactivation_squared_sum / total_num 
         preactivation_var = preactivation_var - preactivation_mean**2
 
-        contriboptim.bn_update(dl, dnn, cuda=cuda)
+        swa = contriboptim.SWA(optim.SGD(dnn.parameters(), lr=1e-3))
+        swa.bn_update(dl, dnn, cuda=cuda)
         self.assertEqual(preactivation_mean, dnn.bn.running_mean)
         self.assertEqual(preactivation_var, dnn.bn.running_var, prec=1e-1)
 
