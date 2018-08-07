@@ -247,7 +247,6 @@ class TestSWA(TestCase):
     #Test SWA
     
     def test_swa(self):
-        print("here")
         def sgd_constructor(params):
             sgd = optim.SGD(params, lr=1e-3)
             return contriboptim.SWA(
@@ -308,11 +307,8 @@ class TestSWA(TestCase):
                                  rmsprop_constructor, rprop_constructor,
                                  asgd_constructor, lbfgs_constructor]
 
-        #auto_constructor_list = [sgd_momentum_constructor]
 
         for i, constructor in enumerate(auto_constructor_list):
-            print(constructor)
-            # Pass
             self._test_rosenbrock(constructor)
             self._test_basic_cases(
                     lambda weight, bias: constructor([weight, bias]))
@@ -338,7 +334,7 @@ class TestSWA(TestCase):
                         {'params': [y], 'lr': 1e-3}], lr=1e-2, momentum=0.9)
         return x, y, loss_fun, opt
 
-    def testSWAAuto(self):
+    def test_swa_auto(self):
         # Tests SWA in Auto mode: values of x and y after opt.swap_swa_sgd()
         # should be equal to the manually computed averages
         x, y, loss_fun, opt = self._define_vars_loss_opt()
@@ -365,7 +361,7 @@ class TestSWA(TestCase):
         self.assertEqual(x_avg, x)
         self.assertEqual(y_avg, y)      
 
-    def testSWAManual(self):
+    def test_swa_manual(self):
         # Tests SWA in manual mode: values of x and y after opt.swap_swa_sgd()
         # should be equal to the manually computed averages
         x, y, loss_fun, opt = self._define_vars_loss_opt()
@@ -393,7 +389,7 @@ class TestSWA(TestCase):
         self.assertEqual(x_avg, x)
         self.assertEqual(y_avg, y)      
 
-    def testSWAManualGroup(self):
+    def test_swa_manual_group(self):
         # Tests SWA in manual mode with only y param group updated: 
         # value of x should not change after opt.swap_swa_sgd() and y should
         # be equal to the manually computed average
@@ -420,7 +416,7 @@ class TestSWA(TestCase):
         self.assertEqual(y_avg, y)      
         self.assertEqual(x_before_swap, x)      
 
-    def testSWAAutoGroupAddedDuringRun(self):
+    def test_swa_auto_group_added_during_run(self):
         # Tests SWA in Auto mode with the second param group added after several
         # optimizations steps. The expected behavior is that the averaging for
         # the second param group starts at swa_start steps after it is added. 
@@ -472,7 +468,7 @@ class TestSWA(TestCase):
         self.assertEqual(x_avg, x)
         self.assertEqual(y_avg, y)      
         
-    def testSWALR(self):
+    def test_swa_lr(self):
         # Tests SWA learning rate: in auto mode after swa_start steps the
         # learning rate should be changed to swa_lr; in manual mode swa_lr 
         # must be ignored
@@ -510,7 +506,7 @@ class TestSWA(TestCase):
             lr = opt.param_groups[0]["lr"]
             self.assertEqual(lr, initial_lr)    
 
-    def testAutoMode(self):
+    def test_swa_auto_mode(self):
         # Tests that SWA mode (auto or manual) is chosen correctly based on
         # parameters provided
 
@@ -542,7 +538,7 @@ class TestSWA(TestCase):
         opt = contriboptim.SWA(base_opt, swa_lr=swa_lr)
         self.assertEqual(opt._auto_mode, False)
 
-    def testSWARaises(self):
+    def test_swa_raises(self):
         # Tests that SWA raises errors for wrong parameter values
 
         x, y, loss_fun, opt = self._define_vars_loss_opt()
@@ -614,7 +610,7 @@ class TestSWA(TestCase):
         self.assertEqual(preactivation_mean, dnn.bn.running_mean)
         self.assertEqual(preactivation_var, dnn.bn.running_var, prec=1e-1)
 
-    def testBNUpdate(self):
+    def test_bn_update(self):
         # Test bn_update for fully-connected and convolutional networks with
         # BatchNorm1d and BatchNorm2d respectively
         objects = 100
