@@ -52,168 +52,168 @@ torch.manual_seed(SEED)
 def run_tests(argv=UNITTEST_ARGS):
     unittest.main(argv=argv)
 
-PY3 = sys.version_info > (3, 0)
-PY34 = sys.version_info >= (3, 4)
-
-IS_WINDOWS = sys.platform == "win32"
-IS_PPC = platform.machine() == "ppc64le"
-
-
-def _check_module_exists(name):
-    r"""Returns if a top-level module with :attr:`name` exists *without**
-    importing it. This is generally safer than try-catch block around a
-    `import X`. It avoids third party libraries breaking assumptions of some of
-    our tests, e.g., setting multiprocessing start method when imported
-    (see librosa/#747, torchvision/#544).
-    """
-    if not PY3:  # Python 2
-        import imp
-        try:
-            imp.find_module(name)
-            return True
-        except ImportError:
-            return False
-    elif PY34:  # Python [3, 3.4)
-        import importlib
-        loader = importlib.find_loader(name)
-        return loader is not None
-    else:  # Python >= 3.4
-        import importlib
-        spec = importlib.util.find_spec(name)
-        return spec is not None
-
-TEST_NUMPY = _check_module_exists('numpy')
-TEST_SCIPY = _check_module_exists('scipy')
-TEST_MKL = torch.backends.mkl.is_available()
-
-# On Py2, importing librosa 0.6.1 triggers a TypeError (if using newest joblib)
-# see librosa/librosa#729.
-# TODO: allow Py2 when librosa 0.6.2 releases
-TEST_LIBROSA = _check_module_exists('librosa') and PY3
-
-NO_MULTIPROCESSING_SPAWN = os.environ.get('NO_MULTIPROCESSING_SPAWN', '0') == '1'
-TEST_WITH_ASAN = os.getenv('PYTORCH_TEST_WITH_ASAN', '0') == '1'
-TEST_WITH_UBSAN = os.getenv('PYTORCH_TEST_WITH_UBSAN', '0') == '1'
-
-if TEST_NUMPY:
-    import numpy
+#PY3 = sys.version_info > (3, 0)
+#PY34 = sys.version_info >= (3, 4)
+#
+#IS_WINDOWS = sys.platform == "win32"
+#IS_PPC = platform.machine() == "ppc64le"
 
 
-def skipIfNoLapack(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        try:
-            fn(*args, **kwargs)
-        except Exception as e:
-            if 'Lapack library not found' in e.args[0]:
-                raise unittest.SkipTest('Compiled without Lapack')
-            raise
-    return wrapper
-
-
-def skipCUDAMemoryLeakCheckIf(condition):
-    def dec(fn):
-        if getattr(fn, '_do_cuda_memory_leak_check', True):  # if current True
-            fn._do_cuda_memory_leak_check = not condition
-        return fn
-    return dec
-
-
-def skipIfNoZeroSize(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        if torch._C._use_zero_size_dim():
-            fn(*args, **kwargs)
-        else:
-            raise unittest.SkipTest('Compiled without arbitrary zero size dimension support')
-    return wrapper
-
-
-def get_cuda_memory_usage():
-    # we don't need CUDA synchronize because the statistics are not tracked at
-    # actual freeing, but at when marking the block as free.
-    num_devices = torch.cuda.device_count()
-    gc.collect()
-    return tuple(torch.cuda.memory_allocated(i) for i in range(num_devices))
-
-
-def suppress_warnings(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            fn(*args, **kwargs)
-    return wrapper
-
-
-def get_cpu_type(type_name):
-    module, name = type_name.rsplit('.', 1)
-    assert module == 'torch.cuda'
-    return getattr(torch, name)
-
-
-def get_gpu_type(type_name):
-    if isinstance(type_name, type):
-        type_name = '{}.{}'.format(type_name.__module__, type_name.__name__)
-    module, name = type_name.rsplit('.', 1)
-    assert module == 'torch'
-    return getattr(torch.cuda, name)
-
-
-def to_gpu(obj, type_map={}):
-    if isinstance(obj, torch.Tensor):
-        assert obj.is_leaf
-        t = type_map.get(obj.type(), get_gpu_type(obj.type()))
-        with torch.no_grad():
-            res = obj.clone().type(t)
-            res.requires_grad = obj.requires_grad
-        return res
-    elif torch.is_storage(obj):
-        return obj.new().resize_(obj.size()).copy_(obj)
-    elif isinstance(obj, list):
-        return [to_gpu(o, type_map) for o in obj]
-    elif isinstance(obj, tuple):
-        return tuple(to_gpu(o, type_map) for o in obj)
-    else:
-        return deepcopy(obj)
-
-
-def get_function_arglist(func):
-    return inspect.getargspec(func).args
-
-
-def set_rng_seed(seed):
-    torch.manual_seed(seed)
-    random.seed(seed)
-    if TEST_NUMPY:
-        numpy.random.seed(seed)
-
-
-@contextlib.contextmanager
-def freeze_rng_state():
-    rng_state = torch.get_rng_state()
-    if torch.cuda.is_available():
-        cuda_rng_state = torch.cuda.get_rng_state()
-    yield
-    if torch.cuda.is_available():
-        torch.cuda.set_rng_state(cuda_rng_state)
-    torch.set_rng_state(rng_state)
-
-
-def iter_indices(tensor):
-    if tensor.dim() == 0:
-        return range(0)
-    if tensor.dim() == 1:
-        return range(tensor.size(0))
-    return product(*(range(s) for s in tensor.size()))
-
-
-def is_iterable(obj):
-    try:
-        iter(obj)
-        return True
-    except TypeError:
-        return False
+#def _check_module_exists(name):
+#    r"""Returns if a top-level module with :attr:`name` exists *without**
+#    importing it. This is generally safer than try-catch block around a
+#    `import X`. It avoids third party libraries breaking assumptions of some of
+#    our tests, e.g., setting multiprocessing start method when imported
+#    (see librosa/#747, torchvision/#544).
+#    """
+#    if not PY3:  # Python 2
+#        import imp
+#        try:
+#            imp.find_module(name)
+#            return True
+#        except ImportError:
+#            return False
+#    elif PY34:  # Python [3, 3.4)
+#        import importlib
+#        loader = importlib.find_loader(name)
+#        return loader is not None
+#    else:  # Python >= 3.4
+#        import importlib
+#        spec = importlib.util.find_spec(name)
+#        return spec is not None
+#
+#TEST_NUMPY = _check_module_exists('numpy')
+#TEST_SCIPY = _check_module_exists('scipy')
+#TEST_MKL = torch.backends.mkl.is_available()
+#
+## On Py2, importing librosa 0.6.1 triggers a TypeError (if using newest joblib)
+## see librosa/librosa#729.
+## TODO: allow Py2 when librosa 0.6.2 releases
+#TEST_LIBROSA = _check_module_exists('librosa') and PY3
+#
+#NO_MULTIPROCESSING_SPAWN = os.environ.get('NO_MULTIPROCESSING_SPAWN', '0') == '1'
+#TEST_WITH_ASAN = os.getenv('PYTORCH_TEST_WITH_ASAN', '0') == '1'
+#TEST_WITH_UBSAN = os.getenv('PYTORCH_TEST_WITH_UBSAN', '0') == '1'
+#
+#if TEST_NUMPY:
+#    import numpy
+#
+#
+#def skipIfNoLapack(fn):
+#    @wraps(fn)
+#    def wrapper(*args, **kwargs):
+#        try:
+#            fn(*args, **kwargs)
+#        except Exception as e:
+#            if 'Lapack library not found' in e.args[0]:
+#                raise unittest.SkipTest('Compiled without Lapack')
+#            raise
+#    return wrapper
+#
+#
+#def skipCUDAMemoryLeakCheckIf(condition):
+#    def dec(fn):
+#        if getattr(fn, '_do_cuda_memory_leak_check', True):  # if current True
+#            fn._do_cuda_memory_leak_check = not condition
+#        return fn
+#    return dec
+#
+#
+#def skipIfNoZeroSize(fn):
+#    @wraps(fn)
+#    def wrapper(*args, **kwargs):
+#        if torch._C._use_zero_size_dim():
+#            fn(*args, **kwargs)
+#        else:
+#            raise unittest.SkipTest('Compiled without arbitrary zero size dimension support')
+#    return wrapper
+#
+#
+#def get_cuda_memory_usage():
+#    # we don't need CUDA synchronize because the statistics are not tracked at
+#    # actual freeing, but at when marking the block as free.
+#    num_devices = torch.cuda.device_count()
+#    gc.collect()
+#    return tuple(torch.cuda.memory_allocated(i) for i in range(num_devices))
+#
+#
+#def suppress_warnings(fn):
+#    @wraps(fn)
+#    def wrapper(*args, **kwargs):
+#        with warnings.catch_warnings():
+#            warnings.simplefilter("ignore")
+#            fn(*args, **kwargs)
+#    return wrapper
+#
+#
+#def get_cpu_type(type_name):
+#    module, name = type_name.rsplit('.', 1)
+#    assert module == 'torch.cuda'
+#    return getattr(torch, name)
+#
+#
+#def get_gpu_type(type_name):
+#    if isinstance(type_name, type):
+#        type_name = '{}.{}'.format(type_name.__module__, type_name.__name__)
+#    module, name = type_name.rsplit('.', 1)
+#    assert module == 'torch'
+#    return getattr(torch.cuda, name)
+#
+#
+#def to_gpu(obj, type_map={}):
+#    if isinstance(obj, torch.Tensor):
+#        assert obj.is_leaf
+#        t = type_map.get(obj.type(), get_gpu_type(obj.type()))
+#        with torch.no_grad():
+#            res = obj.clone().type(t)
+#            res.requires_grad = obj.requires_grad
+#        return res
+#    elif torch.is_storage(obj):
+#        return obj.new().resize_(obj.size()).copy_(obj)
+#    elif isinstance(obj, list):
+#        return [to_gpu(o, type_map) for o in obj]
+#    elif isinstance(obj, tuple):
+#        return tuple(to_gpu(o, type_map) for o in obj)
+#    else:
+#        return deepcopy(obj)
+#
+#
+#def get_function_arglist(func):
+#    return inspect.getargspec(func).args
+#
+#
+#def set_rng_seed(seed):
+#    torch.manual_seed(seed)
+#    random.seed(seed)
+#    if TEST_NUMPY:
+#        numpy.random.seed(seed)
+#
+#
+#@contextlib.contextmanager
+#def freeze_rng_state():
+#    rng_state = torch.get_rng_state()
+#    if torch.cuda.is_available():
+#        cuda_rng_state = torch.cuda.get_rng_state()
+#    yield
+#    if torch.cuda.is_available():
+#        torch.cuda.set_rng_state(cuda_rng_state)
+#    torch.set_rng_state(rng_state)
+#
+#
+#def iter_indices(tensor):
+#    if tensor.dim() == 0:
+#        return range(0)
+#    if tensor.dim() == 1:
+#        return range(tensor.size(0))
+#    return product(*(range(s) for s in tensor.size()))
+#
+#
+#def is_iterable(obj):
+#    try:
+#        iter(obj)
+#        return True
+#    except TypeError:
+#        return False
 
 
 class TestCase(unittest.TestCase):
@@ -256,8 +256,8 @@ class TestCase(unittest.TestCase):
                                  self.id(), after - before, i))
         return types.MethodType(wrapper, self)
 
-    def setUp(self):
-        set_rng_seed(SEED)
+    #def setUp(self):
+    #    set_rng_seed(SEED)
 
     def assertTensorsSlowEqual(self, x, y, prec=None, message=''):
         max_err = 0
@@ -266,9 +266,9 @@ class TestCase(unittest.TestCase):
             max_err = max(max_err, abs(x[index] - y[index]))
         self.assertLessEqual(max_err, prec, message)
 
-    def safeToDense(self, t):
-        r = self.safeCoalesce(t)
-        return r.to_dense()
+    #def safeToDense(self, t):
+    #    r = self.safeCoalesce(t)
+    #    return r.to_dense()
 
     def safeCoalesce(self, t):
         tc = t.coalesce()
@@ -366,156 +366,156 @@ class TestCase(unittest.TestCase):
         else:
             super(TestCase, self).assertEqual(x, y, message)
 
-    def assertAlmostEqual(self, x, y, places=None, msg=None, delta=None, allow_inf=None):
-        prec = delta
-        if places:
-            prec = 10**(-places)
-        self.assertEqual(x, y, prec, msg, allow_inf)
+    #def assertAlmostEqual(self, x, y, places=None, msg=None, delta=None, allow_inf=None):
+    #    prec = delta
+    #    if places:
+    #        prec = 10**(-places)
+    #    self.assertEqual(x, y, prec, msg, allow_inf)
 
-    def assertNotEqual(self, x, y, prec=None, message=''):
-        if isinstance(prec, str) and message == '':
-            message = prec
-            prec = None
-        if prec is None:
-            prec = self.precision
+    #def assertNotEqual(self, x, y, prec=None, message=''):
+    #    if isinstance(prec, str) and message == '':
+    #        message = prec
+    #        prec = None
+    #    if prec is None:
+    #        prec = self.precision
 
-        if isinstance(x, torch.Tensor) and isinstance(y, torch.Tensor):
-            if x.size() != y.size():
-                super(TestCase, self).assertNotEqual(x.size(), y.size())
-            self.assertGreater(x.numel(), 0)
-            y = y.type_as(x)
-            y = y.cuda(device=x.get_device()) if x.is_cuda else y.cpu()
-            nan_mask = x != x
-            if torch.equal(nan_mask, y != y):
-                diff = x - y
-                if diff.is_signed():
-                    diff = diff.abs()
-                diff[nan_mask] = 0
-                max_err = diff.max()
-                self.assertGreaterEqual(max_err, prec, message)
-        elif type(x) == str and type(y) == str:
-            super(TestCase, self).assertNotEqual(x, y)
-        elif is_iterable(x) and is_iterable(y):
-            super(TestCase, self).assertNotEqual(x, y)
-        else:
-            try:
-                self.assertGreaterEqual(abs(x - y), prec, message)
-                return
-            except (TypeError, AssertionError):
-                pass
-            super(TestCase, self).assertNotEqual(x, y, message)
+    #    if isinstance(x, torch.Tensor) and isinstance(y, torch.Tensor):
+    #        if x.size() != y.size():
+    #            super(TestCase, self).assertNotEqual(x.size(), y.size())
+    #        self.assertGreater(x.numel(), 0)
+    #        y = y.type_as(x)
+    #        y = y.cuda(device=x.get_device()) if x.is_cuda else y.cpu()
+    #        nan_mask = x != x
+    #        if torch.equal(nan_mask, y != y):
+    #            diff = x - y
+    #            if diff.is_signed():
+    #                diff = diff.abs()
+    #            diff[nan_mask] = 0
+    #            max_err = diff.max()
+    #            self.assertGreaterEqual(max_err, prec, message)
+    #    elif type(x) == str and type(y) == str:
+    #        super(TestCase, self).assertNotEqual(x, y)
+    #    elif is_iterable(x) and is_iterable(y):
+    #        super(TestCase, self).assertNotEqual(x, y)
+    #    else:
+    #        try:
+    #            self.assertGreaterEqual(abs(x - y), prec, message)
+    #            return
+    #        except (TypeError, AssertionError):
+    #            pass
+    #        super(TestCase, self).assertNotEqual(x, y, message)
 
-    def assertObjectIn(self, obj, iterable):
-        for elem in iterable:
-            if id(obj) == id(elem):
-                return
-        raise AssertionError("object not found in iterable")
+    #def assertObjectIn(self, obj, iterable):
+    #    for elem in iterable:
+    #        if id(obj) == id(elem):
+    #            return
+    #    raise AssertionError("object not found in iterable")
 
-    # TODO: Support context manager interface
-    # NB: The kwargs forwarding to callable robs the 'subname' parameter.
-    # If you need it, manually apply your callable in a lambda instead.
-    def assertExpectedRaises(self, exc_type, callable, *args, **kwargs):
-        subname = None
-        if 'subname' in kwargs:
-            subname = kwargs['subname']
-            del kwargs['subname']
-        try:
-            callable(*args, **kwargs)
-        except exc_type as e:
-            self.assertExpected(str(e), subname)
-            return
-        # Don't put this in the try block; the AssertionError will catch it
-        self.fail(msg="Did not raise when expected to")
+    ## TODO: Support context manager interface
+    ## NB: The kwargs forwarding to callable robs the 'subname' parameter.
+    ## If you need it, manually apply your callable in a lambda instead.
+    #def assertExpectedRaises(self, exc_type, callable, *args, **kwargs):
+    #    subname = None
+    #    if 'subname' in kwargs:
+    #        subname = kwargs['subname']
+    #        del kwargs['subname']
+    #    try:
+    #        callable(*args, **kwargs)
+    #    except exc_type as e:
+    #        self.assertExpected(str(e), subname)
+    #        return
+    #    # Don't put this in the try block; the AssertionError will catch it
+    #    self.fail(msg="Did not raise when expected to")
 
-    def assertWarns(self, callable, msg=''):
-        r"""
-        Test if :attr:`callable` raises a warning.
-        """
-        with warnings.catch_warnings(record=True) as ws:
-            warnings.simplefilter("always")  # allow any warning to be raised
-            callable()
-            self.assertTrue(len(ws) > 0, msg)
+    #def assertWarns(self, callable, msg=''):
+    #    r"""
+    #    Test if :attr:`callable` raises a warning.
+    #    """
+    #    with warnings.catch_warnings(record=True) as ws:
+    #        warnings.simplefilter("always")  # allow any warning to be raised
+    #        callable()
+    #        self.assertTrue(len(ws) > 0, msg)
 
-    def assertWarnsRegex(self, callable, regex, msg=''):
-        r"""
-        Test if :attr:`callable` raises any warning with message that contains
-        the regex pattern :attr:`regex`.
-        """
-        with warnings.catch_warnings(record=True) as ws:
-            warnings.simplefilter("always")  # allow any warning to be raised
-            callable()
-            self.assertTrue(len(ws) > 0, msg)
-            found = any(re.search(regex, str(w.message)) is not None for w in ws)
-            self.assertTrue(found, msg)
+    #def assertWarnsRegex(self, callable, regex, msg=''):
+    #    r"""
+    #    Test if :attr:`callable` raises any warning with message that contains
+    #    the regex pattern :attr:`regex`.
+    #    """
+    #    with warnings.catch_warnings(record=True) as ws:
+    #        warnings.simplefilter("always")  # allow any warning to be raised
+    #        callable()
+    #        self.assertTrue(len(ws) > 0, msg)
+    #        found = any(re.search(regex, str(w.message)) is not None for w in ws)
+    #        self.assertTrue(found, msg)
 
-    def assertExpected(self, s, subname=None):
-        r"""
-        Test that a string matches the recorded contents of a file
-        derived from the name of this test and subname.  This file
-        is placed in the 'expect' directory in the same directory
-        as the test script. You can automatically update the recorded test
-        output using --accept.
+    #def assertExpected(self, s, subname=None):
+    #    r"""
+    #    Test that a string matches the recorded contents of a file
+    #    derived from the name of this test and subname.  This file
+    #    is placed in the 'expect' directory in the same directory
+    #    as the test script. You can automatically update the recorded test
+    #    output using --accept.
 
-        If you call this multiple times in a single function, you must
-        give a unique subname each time.
-        """
-        if not (isinstance(s, str) or (sys.version_info[0] == 2 and isinstance(s, unicode))):
-            raise TypeError("assertExpected is strings only")
+    #    If you call this multiple times in a single function, you must
+    #    give a unique subname each time.
+    #    """
+    #    if not (isinstance(s, str) or (sys.version_info[0] == 2 and isinstance(s, unicode))):
+    #        raise TypeError("assertExpected is strings only")
 
-        def remove_prefix(text, prefix):
-            if text.startswith(prefix):
-                return text[len(prefix):]
-            return text
-        # NB: we take __file__ from the module that defined the test
-        # class, so we place the expect directory where the test script
-        # lives, NOT where test/common.py lives.  This doesn't matter in
-        # PyTorch where all test scripts are in the same directory as
-        # test/common.py, but it matters in onnx-pytorch
-        module_id = self.__class__.__module__
-        munged_id = remove_prefix(self.id(), module_id + ".")
-        test_file = os.path.realpath(sys.modules[module_id].__file__)
-        expected_file = os.path.join(os.path.dirname(test_file),
-                                     "expect",
-                                     munged_id)
-        if subname:
-            expected_file += "-" + subname
-        expected_file += ".expect"
-        expected = None
+    #    def remove_prefix(text, prefix):
+    #        if text.startswith(prefix):
+    #            return text[len(prefix):]
+    #        return text
+    #    # NB: we take __file__ from the module that defined the test
+    #    # class, so we place the expect directory where the test script
+    #    # lives, NOT where test/common.py lives.  This doesn't matter in
+    #    # PyTorch where all test scripts are in the same directory as
+    #    # test/common.py, but it matters in onnx-pytorch
+    #    module_id = self.__class__.__module__
+    #    munged_id = remove_prefix(self.id(), module_id + ".")
+    #    test_file = os.path.realpath(sys.modules[module_id].__file__)
+    #    expected_file = os.path.join(os.path.dirname(test_file),
+    #                                 "expect",
+    #                                 munged_id)
+    #    if subname:
+    #        expected_file += "-" + subname
+    #    expected_file += ".expect"
+    #    expected = None
 
-        def accept_output(update_type):
-            print("Accepting {} for {}:\n\n{}".format(update_type, munged_id, s))
-            with open(expected_file, 'w') as f:
-                f.write(s)
+    #    def accept_output(update_type):
+    #        print("Accepting {} for {}:\n\n{}".format(update_type, munged_id, s))
+    #        with open(expected_file, 'w') as f:
+    #            f.write(s)
 
-        try:
-            with open(expected_file) as f:
-                expected = f.read()
-        except IOError as e:
-            if e.errno != errno.ENOENT:
-                raise
-            elif ACCEPT:
-                return accept_output("output")
-            else:
-                raise RuntimeError(
-                    ("I got this output for {}:\n\n{}\n\n"
-                     "No expect file exists; to accept the current output, run:\n"
-                     "python {} {} --accept").format(munged_id, s, __main__.__file__, munged_id))
+    #    try:
+    #        with open(expected_file) as f:
+    #            expected = f.read()
+    #    except IOError as e:
+    #        if e.errno != errno.ENOENT:
+    #            raise
+    #        elif ACCEPT:
+    #            return accept_output("output")
+    #        else:
+    #            raise RuntimeError(
+    #                ("I got this output for {}:\n\n{}\n\n"
+    #                 "No expect file exists; to accept the current output, run:\n"
+    #                 "python {} {} --accept").format(munged_id, s, __main__.__file__, munged_id))
 
-        # a hack for JIT tests
-        if IS_WINDOWS:
-            expected = re.sub(r'CppOp\[(.+?)\]', 'CppOp[]', expected)
-            s = re.sub(r'CppOp\[(.+?)\]', 'CppOp[]', s)
+    #    # a hack for JIT tests
+    #    if IS_WINDOWS:
+    #        expected = re.sub(r'CppOp\[(.+?)\]', 'CppOp[]', expected)
+    #        s = re.sub(r'CppOp\[(.+?)\]', 'CppOp[]', s)
 
-        if ACCEPT:
-            if expected != s:
-                return accept_output("updated output")
-        else:
-            if hasattr(self, "assertMultiLineEqual"):
-                # Python 2.7 only
-                # NB: Python considers lhs "old" and rhs "new".
-                self.assertMultiLineEqual(expected, s)
-            else:
-                self.assertEqual(s, expected)
+    #    if ACCEPT:
+    #        if expected != s:
+    #            return accept_output("updated output")
+    #    else:
+    #        if hasattr(self, "assertMultiLineEqual"):
+    #            # Python 2.7 only
+    #            # NB: Python considers lhs "old" and rhs "new".
+    #            self.assertMultiLineEqual(expected, s)
+    #        else:
+    #            self.assertEqual(s, expected)
 
     if sys.version_info < (3, 2):
         # assertRegexpMatches renamed to assertRegex in 3.2
@@ -524,28 +524,28 @@ class TestCase(unittest.TestCase):
         assertRaisesRegex = unittest.TestCase.assertRaisesRegexp
 
 
-def download_file(url, binary=True):
-    if sys.version_info < (3,):
-        from urlparse import urlsplit
-        import urllib2
-        request = urllib2
-        error = urllib2
-    else:
-        from urllib.parse import urlsplit
-        from urllib import request, error
-
-    filename = os.path.basename(urlsplit(url)[2])
-    data_dir = get_writable_path(os.path.join(os.path.dirname(__file__), 'data'))
-    path = os.path.join(data_dir, filename)
-
-    if os.path.exists(path):
-        return path
-    try:
-        data = request.urlopen(url, timeout=15).read()
-        with open(path, 'wb' if binary else 'w') as f:
-            f.write(data)
-        return path
-    except error.URLError:
-        msg = "could not download test file '{}'".format(url)
-        warnings.warn(msg, RuntimeWarning)
-        raise unittest.SkipTest(msg)
+#def download_file(url, binary=True):
+#    if sys.version_info < (3,):
+#        from urlparse import urlsplit
+#        import urllib2
+#        request = urllib2
+#        error = urllib2
+#    else:
+#        from urllib.parse import urlsplit
+#        from urllib import request, error
+#
+#    filename = os.path.basename(urlsplit(url)[2])
+#    data_dir = get_writable_path(os.path.join(os.path.dirname(__file__), 'data'))
+#    path = os.path.join(data_dir, filename)
+#
+#    if os.path.exists(path):
+#        return path
+#    try:
+#        data = request.urlopen(url, timeout=15).read()
+#        with open(path, 'wb' if binary else 'w') as f:
+#            f.write(data)
+#        return path
+#    except error.URLError:
+#        msg = "could not download test file '{}'".format(url)
+#        warnings.warn(msg, RuntimeWarning)
+#        raise unittest.SkipTest(msg)
