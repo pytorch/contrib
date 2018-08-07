@@ -412,7 +412,7 @@ class TestSWA(TestCase):
             opt.step()
             n_avg, _, y_sum = self._update_test_vars(
                 i, swa_freq, swa_start, n_avg, 0, y_sum, x, y,
-                upd_fun=lambda : opt.update_swa_group(opt.param_groups[1]))
+                upd_fun=lambda: opt.update_swa_group(opt.param_groups[1]))
 
         x_before_swap = x.data.clone()
         opt.swap_swa_sgd()
