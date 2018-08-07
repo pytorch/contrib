@@ -561,7 +561,7 @@ class TestSWA(TestCase):
 
     # bn_update test
 
-    def _testBNUpdate(self, data_tensor, dnn, cuda=False, label_tensor=None):
+    def _test_bn_update(self, data_tensor, dnn, cuda=False, label_tensor=None):
 
         class DatasetFromTensors(data.Dataset):
             def __init__(self, X, y=None):
@@ -640,11 +640,11 @@ class TestSWA(TestCase):
         
         dnn = DNN()
         dnn.train()
-        self._testBNUpdate(x, dnn, False)
-        self._testBNUpdate(x, dnn, False, label_tensor=y)
+        self._test_bn_update(x, dnn, False)
+        self._test_bn_update(x, dnn, False, label_tensor=y)
         if torch.cuda.is_available():
-            self._testBNUpdate(x, dnn.cuda(), True)
-            self._testBNUpdate(x, dnn.cuda(), True, label_tensor=y)
+            self._test_bn_update(x, dnn.cuda(), True)
+            self._test_bn_update(x, dnn.cuda(), True, label_tensor=y)
         self.assertTrue(dnn.training)
 
         # Test bn_update for convolutional network and BatchNorm2d
@@ -671,18 +671,18 @@ class TestSWA(TestCase):
 
         dnn = CNN()
         dnn.train()
-        self._testBNUpdate(x, dnn, False)
-        self._testBNUpdate(x, dnn, False, label_tensor=y)
+        self._test_bn_update(x, dnn, False)
+        self._test_bn_update(x, dnn, False, label_tensor=y)
         if torch.cuda.is_available():
-            self._testBNUpdate(x, dnn.cuda(), True)
-            self._testBNUpdate(x, dnn.cuda(), True, label_tensor=y)
+            self._test_bn_update(x, dnn.cuda(), True)
+            self._test_bn_update(x, dnn.cuda(), True, label_tensor=y)
         self.assertTrue(dnn.training)
 
         # check that bn_update preserves eval mode
         x = torch.rand(objects, channels, height, width)
         dnn = CNN()
         dnn.eval()
-        self._testBNUpdate(x, dnn, False)
+        self._test_bn_update(x, dnn, False)
         self.assertFalse(dnn.training)
 
         # check that momentum is preserved
