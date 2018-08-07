@@ -334,6 +334,14 @@ class TestSWA(TestCase):
                         {'params': [y], 'lr': 1e-3}], lr=1e-2, momentum=0.9)
         return x, y, loss_fun, opt
 
+    @staticmethod
+    def _update_test_vars(i, swa_freq, swa_start, n_avg, x_sum, y_sum, x, y, upd_fun):
+        if i % swa_freq == 0 and i > swa_start:
+            upd_fun()
+            n_avg += 1
+            x_sum += x.data
+            y_sum += y.data
+
     def test_swa_auto(self):
         # Tests SWA in Auto mode: values of x and y after opt.swap_swa_sgd()
         # should be equal to the manually computed averages
@@ -350,10 +358,13 @@ class TestSWA(TestCase):
             loss = loss_fun(x, y)
             loss.backward()
             opt.step()
-            if i % swa_freq == 0 and i > swa_start:
-                n_avg += 1
-                x_sum += x.data
-                y_sum += y.data
+            self.update_test_vars(
+                i, swa_freq, swa_start, n_avg, x_sum, y_sum, x, y,
+                upd_fun=lambda : pass)
+            #if i % swa_freq == 0 and i > swa_start:
+            #    n_avg += 1
+            #    x_sum += x.data
+            #    y_sum += y.data
 
         opt.swap_swa_sgd()
         x_avg = x_sum / n_avg
@@ -377,11 +388,14 @@ class TestSWA(TestCase):
             loss = loss_fun(x, y)
             loss.backward()
             opt.step()
-            if i % swa_freq == 0 and i > swa_start:
-                opt.update_swa()
-                n_avg += 1
-                x_sum += x.data
-                y_sum += y.data
+            self.update_test_vars(
+                i, swa_freq, swa_start, n_avg, x_sum, y_sum, x, y,
+                upd_fun=opt.update_swa)
+            #if i % swa_freq == 0 and i > swa_start:
+            #    opt.update_swa()
+            #    n_avg += 1
+            #    x_sum += x.data
+            #    y_sum += y.data
 
         opt.swap_swa_sgd()
         x_avg = x_sum / n_avg
@@ -405,10 +419,13 @@ class TestSWA(TestCase):
             loss = loss_fun(x, y)
             loss.backward()
             opt.step()
-            if i % swa_freq == 0 and i > swa_start:
-                opt.update_swa_group(opt.param_groups[1])
-                n_avg += 1
-                y_sum += y.data
+            self.update_test_vars(
+                i, swa_freq, swa_start, n_avg, x_sum, y_sum, x, y,
+                upd_fun=lambda : opt.update_swa_group(opt.param_groups[1]))
+            #if i % swa_freq == 0 and i > swa_start:
+            #    opt.update_swa_group(opt.param_groups[1])
+            #    n_avg += 1
+            #    y_sum += y.data
 
         x_before_swap = x.data.clone()
         opt.swap_swa_sgd()
@@ -506,7 +523,7 @@ class TestSWA(TestCase):
             lr = opt.param_groups[0]["lr"]
             self.assertEqual(lr, initial_lr)    
 
-    def test_swa_auto_mode(self):
+    def test_swa_auto_mode_detection(self):
         # Tests that SWA mode (auto or manual) is chosen correctly based on
         # parameters provided
 
