@@ -358,7 +358,7 @@ class TestCase(unittest.TestCase):
     @contextlib.contextmanager
     def assertWarns(self, msg=''):
         r"""
-        Test if :attr:`callable` raises a warning.
+        As a context manager, test if wrapped code raises a warning.
         """
         with warnings.catch_warnings(record=True) as ws:
             warnings.simplefilter("always")  # allow any warning to be raised
@@ -368,8 +368,8 @@ class TestCase(unittest.TestCase):
     @contextlib.contextmanager
     def assertWarnsRegex(self, regex, msg=''):
         r"""
-        Test if :attr:`callable` raises any warning with message that contains
-        the regex pattern :attr:`regex`.
+        As a context manager, test if wrapped code raises any warning with
+         message that contains the regex pattern :attr:`regex`.
         """
         with warnings.catch_warnings(record=True) as ws:
             warnings.simplefilter("always")  # allow any warning to be raised
@@ -377,12 +377,6 @@ class TestCase(unittest.TestCase):
             self.assertTrue(len(ws) > 0, msg)
             found = any(re.search(regex, str(w.message)) is not None for w in ws)
             self.assertTrue(found, msg)
-
-    if sys.version_info < (3, 2):
-        # assertRegexpMatches renamed to assertRegex in 3.2
-        assertRegex = unittest.TestCase.assertRegexpMatches
-        # assertRaisesRegexp renamed to assertRaisesRegex in 3.2
-        assertRaisesRegex = unittest.TestCase.assertRaisesRegexp
 
     def assertExpected(self, s, subname=None):
         r"""
