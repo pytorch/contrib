@@ -2,6 +2,7 @@ import torch
 from torch.nn import Module
 from .. import functional as F
 
+
 class FiLM(Module):
     r"""Applies Feature-wise Linear Modulation to the incoming data as described
     in the paper `FiLM: Visual Reasoning with a General Conditioning Layer`_ .

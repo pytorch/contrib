@@ -53,6 +53,7 @@ CUDA_DEVICE = TEST_CUDA and torch.device("cuda:0")
 TEST_CUDNN = TEST_CUDA and torch.backends.cudnn.is_acceptable(torch.tensor(1., device=CUDA_DEVICE))
 TEST_CUDNN_VERSION = TEST_CUDNN and torch.backends.cudnn.version()
 
+
 def _check_module_exists(name):
     r"""Returns if a top-level module with :attr:`name` exists *without**
     importing it. This is generally safer than try-catch block around a
