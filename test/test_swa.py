@@ -1,3 +1,4 @@
+import re
 import functools
 from copy import deepcopy
 import torch
@@ -34,10 +35,10 @@ class TestSWA(TestCase):
     def _test_rosenbrock(self, constructor, automode=True):
         # automode shows wether we need to update SWA params manually
 
-        params = Variable(torch.Tensor([1.5, 1.5]), requires_grad=True)
+        params = torch.tensor([1.5, 1.5], requires_grad=True)
         optimizer = constructor([params])
 
-        solution = torch.Tensor([1, 1])
+        solution = torch.tensor([1., 1.])
         initial_dist = params.data.dist(solution)
 
         def eval():
@@ -65,14 +66,14 @@ class TestSWA(TestCase):
     def _test_rosenbrock_sparse(self, constructor, sparse_only=False):
         params_t = torch.Tensor([1.5, 1.5])
 
-        params = Variable(params_t, requires_grad=True)
+        params = torch.tensor([1.5, 1.5], requires_grad=True)
         optimizer = constructor([params])
 
         if not sparse_only:
-            params_c = Variable(params_t.clone(), requires_grad=True)
+            params_c = params.detach().clone().requires_grad_()
             optimizer_c = constructor([params_c])
 
-        solution = torch.Tensor([1, 1])
+        solution = torch.tensor([1., 1.])
         initial_dist = params.data.dist(solution)
 
         def eval(params, sparse_grad, w):
@@ -109,9 +110,8 @@ class TestSWA(TestCase):
         self.assertLessEqual(params.data.dist(solution), initial_dist)
 
     def _test_basic_cases_template(self, weight, bias, input, constructor):
-        weight = Variable(weight, requires_grad=True)
-        bias = Variable(bias, requires_grad=True)
-        input = Variable(input)
+        weight = weight.requires_grad_()
+        bias = bias.requires_grad_()
         optimizer = constructor(weight, bias)
 
         # to check if the optimizer can be printed as a string
@@ -132,9 +132,8 @@ class TestSWA(TestCase):
         self.assertLess(fn().item(), initial_value)
 
     def _test_state_dict(self, weight, bias, input, constructor):
-        weight = Variable(weight, requires_grad=True)
-        bias = Variable(bias, requires_grad=True)
-        input = Variable(input)
+        weight = weight.requires_grad_()
+        bias = bias.requires_grad_()
 
         def fn_base(optimizer, weight, bias):
             optimizer.zero_grad()
@@ -147,11 +146,12 @@ class TestSWA(TestCase):
         fn = functools.partial(fn_base, optimizer, weight, bias)
 
         # Prime the optimizer
+        optimizer.update_swa()
         for i in range(20):
             optimizer.step(fn)
         # Clone the weights and construct new optimizer for them
-        weight_c = Variable(weight.data.clone(), requires_grad=True)
-        bias_c = Variable(bias.data.clone(), requires_grad=True)
+        weight_c = weight.detach().clone().requires_grad_()
+        bias_c = bias.detach().clone().requires_grad_()
         optimizer_c = constructor(weight_c, bias_c)
         fn_c = functools.partial(fn_base, optimizer_c, weight_c, bias_c)
         # Load state dict
@@ -414,7 +414,11 @@ class TestSWA(TestCase):
                 upd_fun=lambda: opt.update_swa_group(opt.param_groups[1]))
 
         x_before_swap = x.data.clone()
-        opt.swap_swa_sgd()
+
+        def swap_swa_sgd():
+            opt.swap_swa_sgd()
+
+        self.assertWarnsRegex(swap_swa_sgd, re.escape(r"SWA wasn't applied to param {}".format(x)))
         y_avg = y_sum / n_avg
         self.assertEqual(y_avg, y)
         self.assertEqual(x_before_swap, x)
@@ -526,20 +530,18 @@ class TestSWA(TestCase):
         opt = contriboptim.SWA(base_opt, swa_start=swa_start, swa_freq=swa_freq)
         self.assertEqual(opt._auto_mode, True)
 
-        opt = contriboptim.SWA(base_opt, swa_start=swa_start, swa_lr=swa_lr)
-        self.assertEqual(opt._auto_mode, False)
+        def test_args_partial_specification_warn(**kwargs):
+            def fn():
+                opt = contriboptim.SWA(base_opt, **kwargs)
+                self.assertEqual(opt._auto_mode, False)
 
-        opt = contriboptim.SWA(base_opt, swa_freq=swa_freq, swa_lr=swa_lr)
-        self.assertEqual(opt._auto_mode, False)
+            self.assertWarnsRegex(fn, "Some of swa_start, swa_freq is None")
 
-        opt = contriboptim.SWA(base_opt, swa_start=swa_start)
-        self.assertEqual(opt._auto_mode, False)
-
-        opt = contriboptim.SWA(base_opt, swa_freq=swa_freq)
-        self.assertEqual(opt._auto_mode, False)
-
-        opt = contriboptim.SWA(base_opt, swa_lr=swa_lr)
-        self.assertEqual(opt._auto_mode, False)
+        test_args_partial_specification_warn(swa_start=swa_start, swa_lr=swa_lr)
+        test_args_partial_specification_warn(swa_freq=swa_freq, swa_lr=swa_lr)
+        test_args_partial_specification_warn(swa_start=swa_start)
+        test_args_partial_specification_warn(swa_freq=swa_freq)
+        test_args_partial_specification_warn(swa_lr=swa_lr)
 
     def test_swa_raises(self):
         # Tests that SWA raises errors for wrong parameter values
@@ -560,7 +562,7 @@ class TestSWA(TestCase):
 
     # bn_update test
 
-    def _test_bn_update(self, data_tensor, dnn, cuda=False, label_tensor=None):
+    def _test_bn_update(self, data_tensor, dnn, device, label_tensor=None):
 
         class DatasetFromTensors(data.Dataset):
             def __init__(self, X, y=None):
@@ -583,23 +585,19 @@ class TestSWA(TestCase):
         ds = DatasetFromTensors(data_tensor, y=label_tensor)
         dl = data.DataLoader(ds, batch_size=5, shuffle=True)
 
-        preactivation_sum = torch.zeros(dnn.n_features)
-        preactivation_squared_sum = torch.zeros(dnn.n_features)
-        if cuda:
-            preactivation_sum = preactivation_sum.cuda()
-            preactivation_squared_sum = preactivation_squared_sum.cuda()
+        preactivation_sum = torch.zeros(dnn.n_features, device=device)
+        preactivation_squared_sum = torch.zeros(dnn.n_features, device=device)
         total_num = 0
         for x in dl:
             if with_y:
                 x, _ = x
-            if cuda:
-                x = x.cuda()
+            x = x.to(device)
 
-            dnn.forward(x)
+            dnn(x)
             preactivations = dnn.compute_preactivation(x)
             if len(preactivations.shape) == 4:
                 preactivations = preactivations.transpose(1, 3)
-            preactivations = preactivations.contiguous().view(-1, dnn.n_features)
+            preactivations = preactivations.reshape(-1, dnn.n_features)
             total_num += preactivations.shape[0]
 
             preactivation_sum += torch.sum(preactivations, dim=0)
@@ -610,17 +608,34 @@ class TestSWA(TestCase):
         preactivation_var = preactivation_var - preactivation_mean**2
 
         swa = contriboptim.SWA(optim.SGD(dnn.parameters(), lr=1e-3))
-        swa.bn_update(dl, dnn, cuda=cuda)
+        swa.bn_update(dl, dnn, device=device)
         self.assertEqual(preactivation_mean, dnn.bn.running_mean)
         self.assertEqual(preactivation_var, dnn.bn.running_var, prec=1e-1)
 
     def test_bn_update(self):
+        def test(net_cls, x_shape, y_shape, device):
+            x = torch.rand(x_shape, device=device)
+            y = torch.rand(y_shape, device=device)
+
+            dnn = net_cls().to(device)
+            orig_momentum = dnn.bn.momentum
+            dnn.train()
+            self._test_bn_update(x, dnn, device)
+            self._test_bn_update(x, dnn, device, label_tensor=y)
+            self.assertTrue(dnn.training)
+
+            # check that bn_update preserves eval mode
+            dnn.eval()
+            self._test_bn_update(x, dnn, device)
+            self.assertFalse(dnn.training)
+
+            # check that momentum is preserved
+            self.assertEqual(dnn.bn.momentum, orig_momentum)
+
         # Test bn_update for fully-connected and convolutional networks with
         # BatchNorm1d and BatchNorm2d respectively
         objects = 100
         input_features = 5
-        x = torch.rand(objects, input_features)
-        y = torch.rand(objects)
 
         class DNN(nn.Module):
             def __init__(self):
@@ -637,21 +652,14 @@ class TestSWA(TestCase):
                 x = self.bn(x)
                 return x
 
-        dnn = DNN()
-        dnn.train()
-        self._test_bn_update(x, dnn, False)
-        self._test_bn_update(x, dnn, False, label_tensor=y)
+        test(DNN, (objects, input_features), objects, 'cpu')
         if torch.cuda.is_available():
-            self._test_bn_update(x, dnn.cuda(), True)
-            self._test_bn_update(x, dnn.cuda(), True, label_tensor=y)
-        self.assertTrue(dnn.training)
+            test(DNN, (objects, input_features), objects, 'cuda')
 
         # Test bn_update for convolutional network and BatchNorm2d
         objects = 100
         channels = 3
         height, width = 5, 5
-        x = torch.rand(objects, channels, height, width)
-        y = torch.rand(objects)
 
         class CNN(nn.Module):
             def __init__(self):
@@ -668,24 +676,9 @@ class TestSWA(TestCase):
                 x = self.bn(x)
                 return x
 
-        dnn = CNN()
-        dnn.train()
-        self._test_bn_update(x, dnn, False)
-        self._test_bn_update(x, dnn, False, label_tensor=y)
+        test(CNN, (objects, channels, height, width), objects, 'cpu')
         if torch.cuda.is_available():
-            self._test_bn_update(x, dnn.cuda(), True)
-            self._test_bn_update(x, dnn.cuda(), True, label_tensor=y)
-        self.assertTrue(dnn.training)
-
-        # check that bn_update preserves eval mode
-        x = torch.rand(objects, channels, height, width)
-        dnn = CNN()
-        dnn.eval()
-        self._test_bn_update(x, dnn, False)
-        self.assertFalse(dnn.training)
-
-        # check that momentum is preserved
-        self.assertEqual(dnn.bn.momentum, 0.3)
+            test(CNN, (objects, channels, height, width), objects, 'cuda')
 
 
 if __name__ == '__main__':

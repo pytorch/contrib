@@ -202,6 +202,27 @@ class TestCase(unittest.TestCase):
         else:
             super(TestCase, self).assertEqual(x, y, message)
 
+    def assertWarns(self, callable, msg=''):
+        r"""
+        Test if :attr:`callable` raises a warning.
+        """
+        with warnings.catch_warnings(record=True) as ws:
+            warnings.simplefilter("always")  # allow any warning to be raised
+            callable()
+            self.assertTrue(len(ws) > 0, msg)
+
+    def assertWarnsRegex(self, callable, regex, msg=''):
+        r"""
+        Test if :attr:`callable` raises any warning with message that contains
+        the regex pattern :attr:`regex`.
+        """
+        with warnings.catch_warnings(record=True) as ws:
+            warnings.simplefilter("always")  # allow any warning to be raised
+            callable()
+            self.assertTrue(len(ws) > 0, msg)
+            found = any(re.search(regex, str(w.message)) is not None for w in ws)
+            self.assertTrue(found, msg)
+
     if sys.version_info < (3, 2):
         # assertRegexpMatches renamed to assertRegex in 3.2
         assertRegex = unittest.TestCase.assertRegexpMatches

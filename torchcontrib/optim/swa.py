@@ -18,14 +18,15 @@ class SWA(Optimizer):
         and applying SWA on top of that optimizer.
 
         SWA can be used in two modes: automatic and manual. In the automatic
-        mode SWA running averages are automatically updated every `swa_freq`
-        steps after `swa_start` steps of optimization. If `swa_lr` is provided,
-        the learning rate of the optimizer is reset to `swa_lr` at every step
-        starting from `swa_start`. To use SWA in automatic mode provide values
-        for both `swa_start` and `swa_freq` arguments.
+        mode SWA running averages are automatically updated every
+        :attr:`swa_freq` steps after :attr:`swa_start` steps of optimization. If
+        :attr:`swa_lr` is provided, the learning rate of the optimizer is reset
+        to :attr:`swa_lr` at every step starting from :attr:`swa_start`. To use
+        SWA in automatic mode provide values for both :attr:`swa_start` and
+        :attr:`swa_freq` arguments.
 
-        Alternatively, in the manual mode use `update_swa` or
-        `update_swa_group` methods to update the SWA running averages.
+        Alternatively, in the manual mode, use :meth:`update_swa` or
+        :meth:`update_swa_group` methods to update the SWA running averages.
 
         In the end of training use `swap_swa_sgd` method to set the optimized
         variables to the computed averages.
@@ -62,20 +63,21 @@ class SWA(Optimizer):
             >>> opt.swap_swa_sgd()
 
         .. note::
-            SWA does not support parameter-specific values of `swa_start`,
-            `swa_freq` or `swa_lr`. In automatic mode SWA uses the same
-            `swa_start`, `swa_freq` and `swa_lr` for all parameter groups.
-            If needed, use manual mode with `update_swa_group` to use different
-            update schedules for different parameter groups.
+            SWA does not support parameter-specific values of :attr:`swa_start`,
+            :attr:`swa_freq` or :attr:`swa_lr`. In automatic mode SWA uses the
+            same :attr:`swa_start`, :attr:`swa_freq` and :attr:`swa_lr` for all
+            parameter groups. If needed, use manual mode with
+            :meth:`update_swa_group` to use different update schedules for
+            different parameter groups.
 
         .. note::
-            Call `swap_swa_sgd` in the end of training to use the computed
+            Call :meth:`swap_swa_sgd` in the end of training to use the computed
             running averages.
 
         .. note::
             If you are using SWA to optimize the parameters of a Neural Network
-            containing Batch Normalization, you need to update the
-            `running_mean` and `running_var` statistics of the
+            containing Batch Normalization layers, you need to update the
+            :attr:`running_mean` and :attr:`running_var` statistics of the
             Batch Normalization module. You can do so by using
             `torchcontrib.optim.swa.bn_update` utility.
 
@@ -117,7 +119,6 @@ class SWA(Optimizer):
 
     @staticmethod
     def _check_params(self, swa_start, swa_freq):
-
         params = [swa_start, swa_freq]
         params_none = [param is None for param in params]
         if not all(params_none) and any(params_none):
@@ -137,7 +138,7 @@ class SWA(Optimizer):
                 param_group['lr'] = self.swa_lr
 
     def update_swa_group(self, group):
-        r"""Updates the SWA running averagesfor the given parameter group.
+        r"""Updates the SWA running averages for the given parameter group.
 
         Arguments:
             param_group (dict): Specifies for what parameter group SWA running
@@ -260,10 +261,10 @@ class SWA(Optimizer):
         self.optimizer.add_param_group(param_group)
 
     @staticmethod
-    def bn_update(loader, model, cuda=True):
+    def bn_update(loader, model, device=None):
         r"""Updates BatchNorm running_mean, running_var buffers in the model.
 
-        It performs 1 pass over data in `loader` to estimate the activation
+        It performs one pass over data in `loader` to estimate the activation
         statistics for BatchNorm layers in the model.
 
         Args:
@@ -275,8 +276,8 @@ class SWA(Optimizer):
             model (torch.nn.Module): model for which we seek to update BatchNorm
                 statistics.
 
-            cuda (bool): whether to use apply `.cuda` to the elements of the
-                dataloader.
+            device (torch.device, optional): If set, data will be trasferred to
+                :attr:`device` before being passed into :attr:`model`.
         """
         if not _check_bn(model):
             return
@@ -295,7 +296,10 @@ class SWA(Optimizer):
             for module in momenta.keys():
                 module.momentum = momentum
 
-            model(input_var)
+            if device is not None:
+                input = input.to(device)
+
+            model(input)
             n += b
 
         model.apply(lambda module: _set_momenta(module, momenta))
