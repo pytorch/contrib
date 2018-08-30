@@ -50,6 +50,7 @@ torch.manual_seed(SEED)
 def run_tests(argv=UNITTEST_ARGS):
     unittest.main(argv=argv)
 
+
 def is_iterable(obj):
     try:
         iter(obj)
@@ -191,7 +192,7 @@ class TestCase(unittest.TestCase):
             super(TestCase, self).assertEqual(x, y, message)
         elif isinstance(x, Number) and isinstance(y, Number):
             # Pavel: commenting to avoid import errors
-            #if abs(x) == inf or abs(y) == inf:
+            # if abs(x) == inf or abs(y) == inf:
             #    if allow_inf:
             #        super(TestCase, self).assertEqual(x, y, message)
             #    else:

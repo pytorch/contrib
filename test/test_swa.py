@@ -6,7 +6,7 @@ from torch import sparse
 from torch import optim
 from torch import nn
 import torchcontrib.optim as contriboptim
-from common import TestCase, run_tests# TEST_WITH_UBSAN
+from common import TestCase, run_tests
 from torch.utils import data
 
 
@@ -244,8 +244,8 @@ class TestSWA(TestCase):
     def _build_params_dict_single(self, weight, bias, **kwargs):
         return [dict(params=bias, **kwargs)]
 
-    #Test SWA
-    
+    # Test SWA
+
     def test_swa(self):
         def sgd_constructor(params):
             sgd = optim.SGD(params, lr=1e-3)
@@ -301,9 +301,9 @@ class TestSWA(TestCase):
             return contriboptim.SWA(
                 lbfgs, swa_start=1000, swa_freq=1, swa_lr=1e-3)
 
-        auto_constructor_list = [sgd_constructor, sgd_momentum_constructor, 
-                                 adam_constructor, adadelta_constructor, 
-                                 adagrad_constructor, adamax_constructor, 
+        auto_constructor_list = [sgd_constructor, sgd_momentum_constructor,
+                                 adam_constructor, adadelta_constructor,
+                                 adagrad_constructor, adamax_constructor,
                                  rmsprop_constructor, rprop_constructor,
                                  asgd_constructor, lbfgs_constructor]
 
@@ -318,7 +318,6 @@ class TestSWA(TestCase):
                 self._test_basic_cases(
                         lambda weight, bias: constructor(
                             self._build_params_dict_single(weight, bias, lr=1e-2)))
-
 
         self._test_rosenbrock(sgd_manual_constructor, automode=False)
 
@@ -366,7 +365,7 @@ class TestSWA(TestCase):
         x_avg = x_sum / n_avg
         y_avg = y_sum / n_avg
         self.assertEqual(x_avg, x)
-        self.assertEqual(y_avg, y)      
+        self.assertEqual(y_avg, y)
 
     def test_swa_manual(self):
         # Tests SWA in manual mode: values of x and y after opt.swap_swa_sgd()
@@ -392,10 +391,10 @@ class TestSWA(TestCase):
         x_avg = x_sum / n_avg
         y_avg = y_sum / n_avg
         self.assertEqual(x_avg, x)
-        self.assertEqual(y_avg, y)      
+        self.assertEqual(y_avg, y)
 
     def test_swa_manual_group(self):
-        # Tests SWA in manual mode with only y param group updated: 
+        # Tests SWA in manual mode with only y param group updated:
         # value of x should not change after opt.swap_swa_sgd() and y should
         # be equal to the manually computed average
         x, y, loss_fun, opt = self._define_vars_loss_opt()
@@ -417,13 +416,13 @@ class TestSWA(TestCase):
         x_before_swap = x.data.clone()
         opt.swap_swa_sgd()
         y_avg = y_sum / n_avg
-        self.assertEqual(y_avg, y)      
-        self.assertEqual(x_before_swap, x)      
+        self.assertEqual(y_avg, y)
+        self.assertEqual(x_before_swap, x)
 
     def test_swa_auto_group_added_during_run(self):
         # Tests SWA in Auto mode with the second param group added after several
         # optimizations steps. The expected behavior is that the averaging for
-        # the second param group starts at swa_start steps after it is added. 
+        # the second param group starts at swa_start steps after it is added.
         # For the first group averaging should start swa_start steps after the
         # first step of the optimizer.
 
@@ -447,10 +446,10 @@ class TestSWA(TestCase):
             if i % swa_freq == 0 and i > swa_start:
                 x_n_avg += 1
                 x_sum += x.data
-        
+
         x_avg = x_sum / x_n_avg
 
-        opt.add_param_group({'params': y, 'lr':1e-4})
+        opt.add_param_group({'params': y, 'lr': 1e-4})
 
         for y_step in range(1, 11):
             opt.zero_grad()
@@ -470,11 +469,11 @@ class TestSWA(TestCase):
         x_avg = x_sum / x_n_avg
         y_avg = y_sum / y_n_avg
         self.assertEqual(x_avg, x)
-        self.assertEqual(y_avg, y)      
-        
+        self.assertEqual(y_avg, y)
+
     def test_swa_lr(self):
         # Tests SWA learning rate: in auto mode after swa_start steps the
-        # learning rate should be changed to swa_lr; in manual mode swa_lr 
+        # learning rate should be changed to swa_lr; in manual mode swa_lr
         # must be ignored
 
         # Auto mode
@@ -492,9 +491,9 @@ class TestSWA(TestCase):
             opt.step()
             lr = opt.param_groups[0]["lr"]
             if i > swa_start:
-                self.assertEqual(lr, swa_lr)    
+                self.assertEqual(lr, swa_lr)
             else:
-                self.assertEqual(lr, initial_lr)    
+                self.assertEqual(lr, initial_lr)
 
         # Manual Mode
         x, y, loss, opt = self._define_vars_loss_opt()
@@ -508,7 +507,7 @@ class TestSWA(TestCase):
             loss.backward()
             opt.step()
             lr = opt.param_groups[0]["lr"]
-            self.assertEqual(lr, initial_lr)    
+            self.assertEqual(lr, initial_lr)
 
     def test_swa_auto_mode_detection(self):
         # Tests that SWA mode (auto or manual) is chosen correctly based on
@@ -546,11 +545,11 @@ class TestSWA(TestCase):
         # Tests that SWA raises errors for wrong parameter values
 
         x, y, loss_fun, opt = self._define_vars_loss_opt()
-        
+
         with self.assertRaisesRegex(
                 ValueError, "Invalid SWA learning rate: -0.0001"):
             opt = contriboptim.SWA(opt, swa_start=1, swa_freq=2, swa_lr=-1e-4)
-        
+
         with self.assertRaisesRegex(
                 ValueError, "Invalid swa_freq: 0"):
             opt = contriboptim.SWA(opt, swa_start=1, swa_freq=0, swa_lr=1e-4)
@@ -568,7 +567,7 @@ class TestSWA(TestCase):
                 self.X = X
                 self.y = y
                 self.N = self.X.shape[0]
-        
+
             def __getitem__(self, index):
                 x = self.X[index]
                 if self.y is None:
@@ -576,10 +575,10 @@ class TestSWA(TestCase):
                 else:
                     y = self.y[index]
                     return x, y
-        
+
             def __len__(self):
-                return self.N 
-        
+                return self.N
+
         with_y = label_tensor is not None
         ds = DatasetFromTensors(data_tensor, y=label_tensor)
         dl = data.DataLoader(ds, batch_size=5, shuffle=True)
@@ -602,12 +601,12 @@ class TestSWA(TestCase):
                 preactivations = preactivations.transpose(1, 3)
             preactivations = preactivations.contiguous().view(-1, dnn.n_features)
             total_num += preactivations.shape[0]
-        
+
             preactivation_sum += torch.sum(preactivations, dim=0)
-            preactivation_squared_sum += torch.sum(preactivations**2, dim=0)  
-            
+            preactivation_squared_sum += torch.sum(preactivations**2, dim=0)
+
         preactivation_mean = preactivation_sum / total_num
-        preactivation_var = preactivation_squared_sum / total_num 
+        preactivation_var = preactivation_squared_sum / total_num
         preactivation_var = preactivation_var - preactivation_mean**2
 
         swa = contriboptim.SWA(optim.SGD(dnn.parameters(), lr=1e-3))
@@ -622,22 +621,22 @@ class TestSWA(TestCase):
         input_features=5
         x = torch.rand(objects, input_features)
         y = torch.rand(objects)
-        
+
         class DNN(nn.Module):
             def __init__(self):
                 super(DNN, self).__init__()
                 self.n_features = 100
                 self.fc1 = nn.Linear(input_features, self.n_features)
                 self.bn = nn.BatchNorm1d(self.n_features)
-                
+
             def compute_preactivation(self, x):
                 return self.fc1(x)
-                
+
             def forward(self, x):
                 x = self.fc1(x)
                 x = self.bn(x)
-                return x 
-        
+                return x
+
         dnn = DNN()
         dnn.train()
         self._test_bn_update(x, dnn, False)
@@ -653,20 +652,20 @@ class TestSWA(TestCase):
         height, width = 5, 5
         x = torch.rand(objects, channels, height, width)
         y = torch.rand(objects)
-            
+
         class CNN(nn.Module):
             def __init__(self):
                 super(CNN, self).__init__()
                 self.n_features = 10
                 self.conv1 = nn.Conv2d(channels, self.n_features, kernel_size=3, padding=1)
                 self.bn = nn.BatchNorm2d(self.n_features, momentum=0.3)
-                
+
             def compute_preactivation(self, x):
                 return self.conv1(x)
-                
+
             def forward(self, x):
                 x = self.conv1(x)
-                x = self.bn(x) 
+                x = self.bn(x)
                 return x
 
         dnn = CNN()
@@ -687,7 +686,7 @@ class TestSWA(TestCase):
 
         # check that momentum is preserved
         self.assertEqual(dnn.bn.momentum, 0.3)
-                
+
 
 if __name__ == '__main__':
     run_tests()
