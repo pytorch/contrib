@@ -310,14 +310,14 @@ class TestSWA(TestCase):
         for i, constructor in enumerate(auto_constructor_list):
             self._test_rosenbrock(constructor)
             self._test_basic_cases(
-                    lambda weight, bias: constructor([weight, bias]))
+                lambda weight, bias: constructor([weight, bias]))
             if i < len(auto_constructor_list) - 1:
                 self._test_basic_cases(
-                        lambda weight, bias: constructor(
-                            self._build_params_dict(weight, bias, lr=1e-2)))
+                    lambda weight, bias: constructor(
+                        self._build_params_dict(weight, bias, lr=1e-2)))
                 self._test_basic_cases(
-                        lambda weight, bias: constructor(
-                            self._build_params_dict_single(weight, bias, lr=1e-2)))
+                    lambda weight, bias: constructor(
+                        self._build_params_dict_single(weight, bias, lr=1e-2)))
 
         self._test_rosenbrock(sgd_manual_constructor, automode=False)
 
@@ -618,7 +618,7 @@ class TestSWA(TestCase):
         # Test bn_update for fully-connected and convolutional networks with
         # BatchNorm1d and BatchNorm2d respectively
         objects = 100
-        input_features=5
+        input_features = 5
         x = torch.rand(objects, input_features)
         y = torch.rand(objects)
 

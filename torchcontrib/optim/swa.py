@@ -223,7 +223,7 @@ class SWA(Optimizer):
         """
         opt_state_dict = self.optimizer.state_dict()
         swa_state = {(id(k) if isinstance(k, torch.Tensor) else k): v
-                        for k, v in self.state.items()}
+                     for k, v in self.state.items()}
         opt_state = opt_state_dict["state"]
         param_groups = opt_state_dict["param_groups"]
         return {"opt_state": opt_state, "swa_state": swa_state,
