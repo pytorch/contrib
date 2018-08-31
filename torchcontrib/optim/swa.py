@@ -163,7 +163,7 @@ class SWA(Optimizer):
             if 'swa_buffer' not in param_state:
                 param_state['swa_buffer'] = torch.zeros_like(p.data)
             buf = param_state['swa_buffer']
-            virtual_decay = 1 / (group["n_avg"] + 1)
+            virtual_decay = 1 / float(group["n_avg"] + 1)
             diff = (p.data - buf) * virtual_decay
             buf.add_(diff)
         group["n_avg"] += 1
@@ -281,7 +281,7 @@ class SWA(Optimizer):
         """
         if not _check_bn(model):
             return
-        was_eval = not model.training
+        was_training = model.training
         model.train()
         momenta = {}
         model.apply(_reset_bn)
@@ -292,7 +292,7 @@ class SWA(Optimizer):
                 input = input[0]
             b = input.size(0)
 
-            momentum = b / (n + b)
+            momentum = b / float(n + b)
             for module in momenta.keys():
                 module.momentum = momentum
 
@@ -303,8 +303,7 @@ class SWA(Optimizer):
             n += b
 
         model.apply(lambda module: _set_momenta(module, momenta))
-        if was_eval:
-            model.eval()
+        model.train(was_training)
 
 
 # BatchNorm utils

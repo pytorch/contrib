@@ -415,10 +415,9 @@ class TestSWA(TestCase):
 
         x_before_swap = x.data.clone()
 
-        def swap_swa_sgd():
+        with self.assertWarnsRegex(re.escape(r"SWA wasn't applied to param {}".format(x))):
             opt.swap_swa_sgd()
 
-        self.assertWarnsRegex(swap_swa_sgd, re.escape(r"SWA wasn't applied to param {}".format(x)))
         y_avg = y_sum / n_avg
         self.assertEqual(y_avg, y)
         self.assertEqual(x_before_swap, x)
@@ -503,7 +502,8 @@ class TestSWA(TestCase):
         x, y, loss, opt = self._define_vars_loss_opt()
         initial_lr = opt.param_groups[0]["lr"]
         swa_lr = initial_lr * 0.1
-        opt = contriboptim.SWA(opt, swa_lr=swa_lr)
+        with self.assertWarnsRegex("Some of swa_start, swa_freq is None"):
+            opt = contriboptim.SWA(opt, swa_lr=swa_lr)
 
         for i in range(1, 11):
             opt.zero_grad()
@@ -530,18 +530,25 @@ class TestSWA(TestCase):
         opt = contriboptim.SWA(base_opt, swa_start=swa_start, swa_freq=swa_freq)
         self.assertEqual(opt._auto_mode, True)
 
-        def test_args_partial_specification_warn(**kwargs):
-            def fn():
-                opt = contriboptim.SWA(base_opt, **kwargs)
-                self.assertEqual(opt._auto_mode, False)
+        with self.assertWarnsRegex("Some of swa_start, swa_freq is None"):
+            opt = contriboptim.SWA(base_opt, swa_start=swa_start, swa_lr=swa_lr)
+            self.assertEqual(opt._auto_mode, False)
 
-            self.assertWarnsRegex(fn, "Some of swa_start, swa_freq is None")
+        with self.assertWarnsRegex("Some of swa_start, swa_freq is None"):
+            opt = contriboptim.SWA(base_opt, swa_freq=swa_freq, swa_lr=swa_lr)
+            self.assertEqual(opt._auto_mode, False)
 
-        test_args_partial_specification_warn(swa_start=swa_start, swa_lr=swa_lr)
-        test_args_partial_specification_warn(swa_freq=swa_freq, swa_lr=swa_lr)
-        test_args_partial_specification_warn(swa_start=swa_start)
-        test_args_partial_specification_warn(swa_freq=swa_freq)
-        test_args_partial_specification_warn(swa_lr=swa_lr)
+        with self.assertWarnsRegex("Some of swa_start, swa_freq is None"):
+            opt = contriboptim.SWA(base_opt, swa_start=swa_start)
+            self.assertEqual(opt._auto_mode, False)
+
+        with self.assertWarnsRegex("Some of swa_start, swa_freq is None"):
+            opt = contriboptim.SWA(base_opt, swa_freq=swa_freq)
+            self.assertEqual(opt._auto_mode, False)
+
+        with self.assertWarnsRegex("Some of swa_start, swa_freq is None"):
+            opt = contriboptim.SWA(base_opt, swa_lr=swa_lr)
+            self.assertEqual(opt._auto_mode, False)
 
     def test_swa_raises(self):
         # Tests that SWA raises errors for wrong parameter values

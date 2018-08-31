@@ -202,23 +202,25 @@ class TestCase(unittest.TestCase):
         else:
             super(TestCase, self).assertEqual(x, y, message)
 
-    def assertWarns(self, callable, msg=''):
+    @contextlib.contextmanager
+    def assertWarns(self, msg=''):
         r"""
         Test if :attr:`callable` raises a warning.
         """
         with warnings.catch_warnings(record=True) as ws:
             warnings.simplefilter("always")  # allow any warning to be raised
-            callable()
+            yield
             self.assertTrue(len(ws) > 0, msg)
 
-    def assertWarnsRegex(self, callable, regex, msg=''):
+    @contextlib.contextmanager
+    def assertWarnsRegex(self, regex, msg=''):
         r"""
         Test if :attr:`callable` raises any warning with message that contains
         the regex pattern :attr:`regex`.
         """
         with warnings.catch_warnings(record=True) as ws:
             warnings.simplefilter("always")  # allow any warning to be raised
-            callable()
+            yield
             self.assertTrue(len(ws) > 0, msg)
             found = any(re.search(regex, str(w.message)) is not None for w in ws)
             self.assertTrue(found, msg)
