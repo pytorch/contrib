@@ -1,3 +1,4 @@
+import re
 import functools
 from copy import deepcopy
 import torch
@@ -6,7 +7,7 @@ from torch import sparse
 from torch import optim
 from torch import nn
 import torchcontrib.optim as contriboptim
-from common import TestCase, run_tests# TEST_WITH_UBSAN
+from common import TestCase, run_tests
 from torch.utils import data
 
 
@@ -34,10 +35,10 @@ class TestSWA(TestCase):
     def _test_rosenbrock(self, constructor, automode=True):
         # automode shows wether we need to update SWA params manually
 
-        params = Variable(torch.Tensor([1.5, 1.5]), requires_grad=True)
+        params = torch.tensor([1.5, 1.5], requires_grad=True)
         optimizer = constructor([params])
 
-        solution = torch.Tensor([1, 1])
+        solution = torch.tensor([1., 1.])
         initial_dist = params.data.dist(solution)
 
         def eval():
@@ -65,14 +66,14 @@ class TestSWA(TestCase):
     def _test_rosenbrock_sparse(self, constructor, sparse_only=False):
         params_t = torch.Tensor([1.5, 1.5])
 
-        params = Variable(params_t, requires_grad=True)
+        params = torch.tensor([1.5, 1.5], requires_grad=True)
         optimizer = constructor([params])
 
         if not sparse_only:
-            params_c = Variable(params_t.clone(), requires_grad=True)
+            params_c = params.detach().clone().requires_grad_()
             optimizer_c = constructor([params_c])
 
-        solution = torch.Tensor([1, 1])
+        solution = torch.tensor([1., 1.])
         initial_dist = params.data.dist(solution)
 
         def eval(params, sparse_grad, w):
@@ -109,9 +110,8 @@ class TestSWA(TestCase):
         self.assertLessEqual(params.data.dist(solution), initial_dist)
 
     def _test_basic_cases_template(self, weight, bias, input, constructor):
-        weight = Variable(weight, requires_grad=True)
-        bias = Variable(bias, requires_grad=True)
-        input = Variable(input)
+        weight = weight.requires_grad_()
+        bias = bias.requires_grad_()
         optimizer = constructor(weight, bias)
 
         # to check if the optimizer can be printed as a string
@@ -132,9 +132,8 @@ class TestSWA(TestCase):
         self.assertLess(fn().item(), initial_value)
 
     def _test_state_dict(self, weight, bias, input, constructor):
-        weight = Variable(weight, requires_grad=True)
-        bias = Variable(bias, requires_grad=True)
-        input = Variable(input)
+        weight = weight.requires_grad_()
+        bias = bias.requires_grad_()
 
         def fn_base(optimizer, weight, bias):
             optimizer.zero_grad()
@@ -147,11 +146,12 @@ class TestSWA(TestCase):
         fn = functools.partial(fn_base, optimizer, weight, bias)
 
         # Prime the optimizer
+        optimizer.update_swa()
         for i in range(20):
             optimizer.step(fn)
         # Clone the weights and construct new optimizer for them
-        weight_c = Variable(weight.data.clone(), requires_grad=True)
-        bias_c = Variable(bias.data.clone(), requires_grad=True)
+        weight_c = weight.detach().clone().requires_grad_()
+        bias_c = bias.detach().clone().requires_grad_()
         optimizer_c = constructor(weight_c, bias_c)
         fn_c = functools.partial(fn_base, optimizer_c, weight_c, bias_c)
         # Load state dict
@@ -244,8 +244,8 @@ class TestSWA(TestCase):
     def _build_params_dict_single(self, weight, bias, **kwargs):
         return [dict(params=bias, **kwargs)]
 
-    #Test SWA
-    
+    # Test SWA
+
     def test_swa(self):
         def sgd_constructor(params):
             sgd = optim.SGD(params, lr=1e-3)
@@ -301,24 +301,23 @@ class TestSWA(TestCase):
             return contriboptim.SWA(
                 lbfgs, swa_start=1000, swa_freq=1, swa_lr=1e-3)
 
-        auto_constructor_list = [sgd_constructor, sgd_momentum_constructor, 
-                                 adam_constructor, adadelta_constructor, 
-                                 adagrad_constructor, adamax_constructor, 
+        auto_constructor_list = [sgd_constructor, sgd_momentum_constructor,
+                                 adam_constructor, adadelta_constructor,
+                                 adagrad_constructor, adamax_constructor,
                                  rmsprop_constructor, rprop_constructor,
                                  asgd_constructor, lbfgs_constructor]
 
         for i, constructor in enumerate(auto_constructor_list):
             self._test_rosenbrock(constructor)
             self._test_basic_cases(
-                    lambda weight, bias: constructor([weight, bias]))
+                lambda weight, bias: constructor([weight, bias]))
             if i < len(auto_constructor_list) - 1:
                 self._test_basic_cases(
-                        lambda weight, bias: constructor(
-                            self._build_params_dict(weight, bias, lr=1e-2)))
+                    lambda weight, bias: constructor(
+                        self._build_params_dict(weight, bias, lr=1e-2)))
                 self._test_basic_cases(
-                        lambda weight, bias: constructor(
-                            self._build_params_dict_single(weight, bias, lr=1e-2)))
-
+                    lambda weight, bias: constructor(
+                        self._build_params_dict_single(weight, bias, lr=1e-2)))
 
         self._test_rosenbrock(sgd_manual_constructor, automode=False)
 
@@ -366,7 +365,7 @@ class TestSWA(TestCase):
         x_avg = x_sum / n_avg
         y_avg = y_sum / n_avg
         self.assertEqual(x_avg, x)
-        self.assertEqual(y_avg, y)      
+        self.assertEqual(y_avg, y)
 
     def test_swa_manual(self):
         # Tests SWA in manual mode: values of x and y after opt.swap_swa_sgd()
@@ -392,10 +391,10 @@ class TestSWA(TestCase):
         x_avg = x_sum / n_avg
         y_avg = y_sum / n_avg
         self.assertEqual(x_avg, x)
-        self.assertEqual(y_avg, y)      
+        self.assertEqual(y_avg, y)
 
     def test_swa_manual_group(self):
-        # Tests SWA in manual mode with only y param group updated: 
+        # Tests SWA in manual mode with only y param group updated:
         # value of x should not change after opt.swap_swa_sgd() and y should
         # be equal to the manually computed average
         x, y, loss_fun, opt = self._define_vars_loss_opt()
@@ -415,15 +414,18 @@ class TestSWA(TestCase):
                 upd_fun=lambda: opt.update_swa_group(opt.param_groups[1]))
 
         x_before_swap = x.data.clone()
-        opt.swap_swa_sgd()
+
+        with self.assertWarnsRegex(re.escape(r"SWA wasn't applied to param {}".format(x))):
+            opt.swap_swa_sgd()
+
         y_avg = y_sum / n_avg
-        self.assertEqual(y_avg, y)      
-        self.assertEqual(x_before_swap, x)      
+        self.assertEqual(y_avg, y)
+        self.assertEqual(x_before_swap, x)
 
     def test_swa_auto_group_added_during_run(self):
         # Tests SWA in Auto mode with the second param group added after several
         # optimizations steps. The expected behavior is that the averaging for
-        # the second param group starts at swa_start steps after it is added. 
+        # the second param group starts at swa_start steps after it is added.
         # For the first group averaging should start swa_start steps after the
         # first step of the optimizer.
 
@@ -447,10 +449,10 @@ class TestSWA(TestCase):
             if i % swa_freq == 0 and i > swa_start:
                 x_n_avg += 1
                 x_sum += x.data
-        
+
         x_avg = x_sum / x_n_avg
 
-        opt.add_param_group({'params': y, 'lr':1e-4})
+        opt.add_param_group({'params': y, 'lr': 1e-4})
 
         for y_step in range(1, 11):
             opt.zero_grad()
@@ -470,11 +472,11 @@ class TestSWA(TestCase):
         x_avg = x_sum / x_n_avg
         y_avg = y_sum / y_n_avg
         self.assertEqual(x_avg, x)
-        self.assertEqual(y_avg, y)      
-        
+        self.assertEqual(y_avg, y)
+
     def test_swa_lr(self):
         # Tests SWA learning rate: in auto mode after swa_start steps the
-        # learning rate should be changed to swa_lr; in manual mode swa_lr 
+        # learning rate should be changed to swa_lr; in manual mode swa_lr
         # must be ignored
 
         # Auto mode
@@ -492,15 +494,16 @@ class TestSWA(TestCase):
             opt.step()
             lr = opt.param_groups[0]["lr"]
             if i > swa_start:
-                self.assertEqual(lr, swa_lr)    
+                self.assertEqual(lr, swa_lr)
             else:
-                self.assertEqual(lr, initial_lr)    
+                self.assertEqual(lr, initial_lr)
 
         # Manual Mode
         x, y, loss, opt = self._define_vars_loss_opt()
         initial_lr = opt.param_groups[0]["lr"]
         swa_lr = initial_lr * 0.1
-        opt = contriboptim.SWA(opt, swa_lr=swa_lr)
+        with self.assertWarnsRegex("Some of swa_start, swa_freq is None"):
+            opt = contriboptim.SWA(opt, swa_lr=swa_lr)
 
         for i in range(1, 11):
             opt.zero_grad()
@@ -508,7 +511,7 @@ class TestSWA(TestCase):
             loss.backward()
             opt.step()
             lr = opt.param_groups[0]["lr"]
-            self.assertEqual(lr, initial_lr)    
+            self.assertEqual(lr, initial_lr)
 
     def test_swa_auto_mode_detection(self):
         # Tests that SWA mode (auto or manual) is chosen correctly based on
@@ -527,30 +530,35 @@ class TestSWA(TestCase):
         opt = contriboptim.SWA(base_opt, swa_start=swa_start, swa_freq=swa_freq)
         self.assertEqual(opt._auto_mode, True)
 
-        opt = contriboptim.SWA(base_opt, swa_start=swa_start, swa_lr=swa_lr)
-        self.assertEqual(opt._auto_mode, False)
+        with self.assertWarnsRegex("Some of swa_start, swa_freq is None"):
+            opt = contriboptim.SWA(base_opt, swa_start=swa_start, swa_lr=swa_lr)
+            self.assertEqual(opt._auto_mode, False)
 
-        opt = contriboptim.SWA(base_opt, swa_freq=swa_freq, swa_lr=swa_lr)
-        self.assertEqual(opt._auto_mode, False)
+        with self.assertWarnsRegex("Some of swa_start, swa_freq is None"):
+            opt = contriboptim.SWA(base_opt, swa_freq=swa_freq, swa_lr=swa_lr)
+            self.assertEqual(opt._auto_mode, False)
 
-        opt = contriboptim.SWA(base_opt, swa_start=swa_start)
-        self.assertEqual(opt._auto_mode, False)
+        with self.assertWarnsRegex("Some of swa_start, swa_freq is None"):
+            opt = contriboptim.SWA(base_opt, swa_start=swa_start)
+            self.assertEqual(opt._auto_mode, False)
 
-        opt = contriboptim.SWA(base_opt, swa_freq=swa_freq)
-        self.assertEqual(opt._auto_mode, False)
+        with self.assertWarnsRegex("Some of swa_start, swa_freq is None"):
+            opt = contriboptim.SWA(base_opt, swa_freq=swa_freq)
+            self.assertEqual(opt._auto_mode, False)
 
-        opt = contriboptim.SWA(base_opt, swa_lr=swa_lr)
-        self.assertEqual(opt._auto_mode, False)
+        with self.assertWarnsRegex("Some of swa_start, swa_freq is None"):
+            opt = contriboptim.SWA(base_opt, swa_lr=swa_lr)
+            self.assertEqual(opt._auto_mode, False)
 
     def test_swa_raises(self):
         # Tests that SWA raises errors for wrong parameter values
 
         x, y, loss_fun, opt = self._define_vars_loss_opt()
-        
+
         with self.assertRaisesRegex(
                 ValueError, "Invalid SWA learning rate: -0.0001"):
             opt = contriboptim.SWA(opt, swa_start=1, swa_freq=2, swa_lr=-1e-4)
-        
+
         with self.assertRaisesRegex(
                 ValueError, "Invalid swa_freq: 0"):
             opt = contriboptim.SWA(opt, swa_start=1, swa_freq=0, swa_lr=1e-4)
@@ -561,14 +569,14 @@ class TestSWA(TestCase):
 
     # bn_update test
 
-    def _test_bn_update(self, data_tensor, dnn, cuda=False, label_tensor=None):
+    def _test_bn_update(self, data_tensor, dnn, device, label_tensor=None):
 
         class DatasetFromTensors(data.Dataset):
             def __init__(self, X, y=None):
                 self.X = X
                 self.y = y
                 self.N = self.X.shape[0]
-        
+
             def __getitem__(self, index):
                 x = self.X[index]
                 if self.y is None:
@@ -576,118 +584,109 @@ class TestSWA(TestCase):
                 else:
                     y = self.y[index]
                     return x, y
-        
+
             def __len__(self):
-                return self.N 
-        
+                return self.N
+
         with_y = label_tensor is not None
         ds = DatasetFromTensors(data_tensor, y=label_tensor)
         dl = data.DataLoader(ds, batch_size=5, shuffle=True)
 
-        preactivation_sum = torch.zeros(dnn.n_features)
-        preactivation_squared_sum = torch.zeros(dnn.n_features)
-        if cuda:
-            preactivation_sum = preactivation_sum.cuda()
-            preactivation_squared_sum = preactivation_squared_sum.cuda()
+        preactivation_sum = torch.zeros(dnn.n_features, device=device)
+        preactivation_squared_sum = torch.zeros(dnn.n_features, device=device)
         total_num = 0
         for x in dl:
             if with_y:
                 x, _ = x
-            if cuda:
-                x = x.cuda()
+            x = x.to(device)
 
-            dnn.forward(x)
+            dnn(x)
             preactivations = dnn.compute_preactivation(x)
             if len(preactivations.shape) == 4:
                 preactivations = preactivations.transpose(1, 3)
-            preactivations = preactivations.contiguous().view(-1, dnn.n_features)
+            preactivations = preactivations.reshape(-1, dnn.n_features)
             total_num += preactivations.shape[0]
-        
+
             preactivation_sum += torch.sum(preactivations, dim=0)
-            preactivation_squared_sum += torch.sum(preactivations**2, dim=0)  
-            
+            preactivation_squared_sum += torch.sum(preactivations**2, dim=0)
+
         preactivation_mean = preactivation_sum / total_num
-        preactivation_var = preactivation_squared_sum / total_num 
+        preactivation_var = preactivation_squared_sum / total_num
         preactivation_var = preactivation_var - preactivation_mean**2
 
         swa = contriboptim.SWA(optim.SGD(dnn.parameters(), lr=1e-3))
-        swa.bn_update(dl, dnn, cuda=cuda)
+        swa.bn_update(dl, dnn, device=device)
         self.assertEqual(preactivation_mean, dnn.bn.running_mean)
         self.assertEqual(preactivation_var, dnn.bn.running_var, prec=1e-1)
 
     def test_bn_update(self):
+        def test(net_cls, x_shape, y_shape, device):
+            x = torch.rand(x_shape, device=device)
+            y = torch.rand(y_shape, device=device)
+
+            dnn = net_cls().to(device)
+            orig_momentum = dnn.bn.momentum
+            dnn.train()
+            self._test_bn_update(x, dnn, device)
+            self._test_bn_update(x, dnn, device, label_tensor=y)
+            self.assertTrue(dnn.training)
+
+            # check that bn_update preserves eval mode
+            dnn.eval()
+            self._test_bn_update(x, dnn, device)
+            self.assertFalse(dnn.training)
+
+            # check that momentum is preserved
+            self.assertEqual(dnn.bn.momentum, orig_momentum)
+
         # Test bn_update for fully-connected and convolutional networks with
         # BatchNorm1d and BatchNorm2d respectively
         objects = 100
-        input_features=5
-        x = torch.rand(objects, input_features)
-        y = torch.rand(objects)
-        
+        input_features = 5
+
         class DNN(nn.Module):
             def __init__(self):
                 super(DNN, self).__init__()
                 self.n_features = 100
                 self.fc1 = nn.Linear(input_features, self.n_features)
                 self.bn = nn.BatchNorm1d(self.n_features)
-                
+
             def compute_preactivation(self, x):
                 return self.fc1(x)
-                
+
             def forward(self, x):
                 x = self.fc1(x)
                 x = self.bn(x)
-                return x 
-        
-        dnn = DNN()
-        dnn.train()
-        self._test_bn_update(x, dnn, False)
-        self._test_bn_update(x, dnn, False, label_tensor=y)
+                return x
+
+        test(DNN, (objects, input_features), objects, 'cpu')
         if torch.cuda.is_available():
-            self._test_bn_update(x, dnn.cuda(), True)
-            self._test_bn_update(x, dnn.cuda(), True, label_tensor=y)
-        self.assertTrue(dnn.training)
+            test(DNN, (objects, input_features), objects, 'cuda')
 
         # Test bn_update for convolutional network and BatchNorm2d
         objects = 100
         channels = 3
         height, width = 5, 5
-        x = torch.rand(objects, channels, height, width)
-        y = torch.rand(objects)
-            
+
         class CNN(nn.Module):
             def __init__(self):
                 super(CNN, self).__init__()
                 self.n_features = 10
                 self.conv1 = nn.Conv2d(channels, self.n_features, kernel_size=3, padding=1)
                 self.bn = nn.BatchNorm2d(self.n_features, momentum=0.3)
-                
+
             def compute_preactivation(self, x):
                 return self.conv1(x)
-                
+
             def forward(self, x):
                 x = self.conv1(x)
-                x = self.bn(x) 
+                x = self.bn(x)
                 return x
 
-        dnn = CNN()
-        dnn.train()
-        self._test_bn_update(x, dnn, False)
-        self._test_bn_update(x, dnn, False, label_tensor=y)
+        test(CNN, (objects, channels, height, width), objects, 'cpu')
         if torch.cuda.is_available():
-            self._test_bn_update(x, dnn.cuda(), True)
-            self._test_bn_update(x, dnn.cuda(), True, label_tensor=y)
-        self.assertTrue(dnn.training)
+            test(CNN, (objects, channels, height, width), objects, 'cuda')
 
-        # check that bn_update preserves eval mode
-        x = torch.rand(objects, channels, height, width)
-        dnn = CNN()
-        dnn.eval()
-        self._test_bn_update(x, dnn, False)
-        self.assertFalse(dnn.training)
-
-        # check that momentum is preserved
-        self.assertEqual(dnn.bn.momentum, 0.3)
-                
 
 if __name__ == '__main__':
     run_tests()
