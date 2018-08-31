@@ -23,6 +23,7 @@ import errno
 import torch
 import torch.cuda
 from torch._utils_internal import get_writable_path
+from torch._six import string_classes, inf
 import torch.backends.cudnn
 import torch.backends.mkl
 
