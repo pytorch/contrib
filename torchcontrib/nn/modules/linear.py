@@ -70,6 +70,7 @@ class SE(Module):
         input_x = x
 
         x = functional.avg_pool2d(x, x.shape[-1])
+        x = x.view(x.shape[0], -1)
         x = functional.relu(self.linear_1(x), inplace=True)
         x = self.linear_2(x)
         x = x.unsqueeze(-1).unsqueeze(-1)
