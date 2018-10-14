@@ -69,7 +69,7 @@ class SE(Module):
     def forward(self, x):
         input_x = x
 
-        x = x.view(*(x.shape[:-2]), -1).mean(-1)
+        x = functional.avg_pool2d(x, x.shape[-1])
         x = functional.relu(self.linear_1(x), inplace=True)
         x = self.linear_2(x)
         x = x.unsqueeze(-1).unsqueeze(-1)
