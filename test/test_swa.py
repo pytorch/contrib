@@ -12,6 +12,7 @@ from torch.utils import data
 from test_optim import rosenbrock, drosenbrock
 from test_optim import TestOptim
 
+
 class TestSWA(TestOptim):
     # Pavel: I slightly update the _test_... functions to (1) remove the
     # legacy-related parts and (2) add oprimizer.swap_swa_sgd() in the end of

@@ -8,13 +8,16 @@ from torch import sparse
 from common import TestCase, run_tests
 import torchcontrib
 
+
 def rosenbrock(tensor):
     x, y = tensor
     return (1 - x) ** 2 + 100 * (y - x ** 2) ** 2
 
+
 def drosenbrock(tensor):
     x, y = tensor
     return torch.DoubleTensor((-400 * x * (y - x ** 2) - 2 * (1 - x), 200 * (y - x ** 2)))
+
 
 class TestOptim(TestCase):
 

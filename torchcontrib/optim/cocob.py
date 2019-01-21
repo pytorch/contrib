@@ -1,6 +1,7 @@
 import torch
 from torch import optim
 
+
 class CocobBackprop(optim.Optimizer):
     """Implements Cocob-Backprop .
     It has been proposed in `Training Deep Networks without Learning Rates
@@ -75,7 +76,8 @@ class CocobBackprop(optim.Optimizer):
                 reward = torch.max(reward + win_amount, torch.zeros_like(reward))
 
                 # Better decides the bet fraction based on so-far observations
-                bet_fraction = neg_grads_sum / (max_observed_scale * (torch.max(grads_abs_sum + max_observed_scale, self.alpha * max_observed_scale)))
+                bet_fraction = neg_grads_sum / (max_observed_scale * (torch.max(grads_abs_sum + max_observed_scale,
+                                                                                self.alpha * max_observed_scale)))
 
                 # Better makes the bet according to decided betting fraction.
                 bet = bet_fraction * (max_observed_scale + reward)

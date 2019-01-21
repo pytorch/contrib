@@ -12,8 +12,8 @@ from common import TestCase, run_tests
 from torch.utils import data
 from test_optim import TestOptim
 
-class TestCocob(TestOptim):
 
+class TestCocob(TestOptim):
     # Test CocobBackprop
 
     def test_cocob_backprop(self):
