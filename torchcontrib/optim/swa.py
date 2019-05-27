@@ -110,6 +110,7 @@ class SWA(Optimizer):
 
         self.optimizer = optimizer
 
+        self.defaults = self.optimizer.defaults
         self.param_groups = self.optimizer.param_groups
         self.state = defaultdict(dict)
         self.opt_state = self.optimizer.state
