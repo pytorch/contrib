@@ -7,7 +7,7 @@ from torch import sparse
 from torch import optim
 from torch import nn
 import torchcontrib.optim as contriboptim
-from common import TestCase, run_tests
+from .common import TestCase, run_tests
 from torch.utils import data
 
 

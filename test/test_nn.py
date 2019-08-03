@@ -4,7 +4,7 @@ import torchcontrib
 import torchcontrib.nn as contrib_nn
 import torchcontrib.nn.functional as contrib_F
 from torch.autograd import gradcheck, gradgradcheck
-from common import run_tests, TestCase
+from .common import run_tests, TestCase
 
 
 class TestNN(TestCase):
