@@ -310,7 +310,9 @@ class TestSWA(TestCase):
         for i, constructor in enumerate(auto_constructor_list):
             self._test_rosenbrock(constructor)
             self._test_basic_cases(
-                lambda weight, bias: constructor([weight, bias]))
+                lambda weight, bias: constructor([weight, bias]),
+                ignore_multidevice=(constructor == lbfgs_constructor)
+            )
             if i < len(auto_constructor_list) - 1:
                 self._test_basic_cases(
                     lambda weight, bias: constructor(
