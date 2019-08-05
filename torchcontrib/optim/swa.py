@@ -80,14 +80,14 @@ class SWA(Optimizer):
             :attr:`running_mean` and :attr:`running_var` statistics of the
             Batch Normalization module. You can do so by using
             `torchcontrib.optim.swa.bn_update` utility.
-            
+
         .. note::
-            See the blogpost 
+            See the blogpost
             https://pytorch.org/blog/stochastic-weight-averaging-in-pytorch/
             for an extended description of this SWA implementation.
-            
+
         .. note::
-            The repo https://github.com/izmailovpavel/contrib_swa_examples 
+            The repo https://github.com/izmailovpavel/contrib_swa_examples
             contains examples of using this SWA implementation.
 
         .. _Averaging Weights Leads to Wider Optima and Better Generalization:
