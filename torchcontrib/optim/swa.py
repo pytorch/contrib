@@ -81,6 +81,15 @@ class SWA(Optimizer):
             Batch Normalization module. You can do so by using
             `torchcontrib.optim.swa.bn_update` utility.
 
+        .. note::
+            See the blogpost
+            https://pytorch.org/blog/stochastic-weight-averaging-in-pytorch/
+            for an extended description of this SWA implementation.
+
+        .. note::
+            The repo https://github.com/izmailovpavel/contrib_swa_examples
+            contains examples of using this SWA implementation.
+
         .. _Averaging Weights Leads to Wider Optima and Better Generalization:
             https://arxiv.org/abs/1803.05407
         .. _Improving Consistency-Based Semi-Supervised Learning with Weight
