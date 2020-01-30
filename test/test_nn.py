@@ -1,5 +1,6 @@
 import unittest
 import torch
+from torch import nn
 import torchcontrib
 import torchcontrib.nn as contrib_nn
 import torchcontrib.nn.functional as contrib_F
@@ -37,6 +38,22 @@ class TestNN(TestCase):
             output = m(inp, half_ones_half_zeros, half_ones_half_neg_ones)
             self.assertEqual(contrib_F.film(inp, half_ones_half_zeros, half_ones_half_neg_ones), output)
             self.assertEqual(output.sum(), inp[:, :5].sum())
+
+    def test_residual_block(self):
+        net = contrib_nn.ResidualBlock(nn.ReLU(inplace=True))
+        input = torch.tensor([-2., -1., 0., 1., 2.])
+        expected = torch.tensor([-2., -1., 0., 2., 4.])
+        self.assertEqual(net(input), expected)
+
+    def test_residual_block_with_shortcut(self):
+        net = contrib_nn.ResidualBlockWithShortcut(
+            nn.ReLU(inplace=True),
+            nn.AvgPool1d(2),
+            shortcut=nn.AvgPool1d(2),
+        )
+        input = torch.tensor([[[-2., 0., 0., 2.]]])
+        expected = torch.tensor([[[-1., 2.]]])
+        self.assertEqual(net(input), expected)
 
 
 if __name__ == '__main__':
