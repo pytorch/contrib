@@ -1,5 +1,9 @@
 import torch
+
+import torch.nn as nn
 from torch.nn import Module
+
+import torch.nn.functional as functional
 from .. import functional as F
 
 
@@ -34,3 +38,43 @@ class FiLM(Module):
     """
     def forward(self, input, gamma, beta):
         return F.film(input, gamma, beta)
+
+
+# partially from https://www.kaggle.com/c/tgs-salt-identification-challenge/discussion/65939
+class SE(Module):
+    r"""Applies Squeeze and Excitation to the incoming data as described
+    in the paper `Squeeze-and-Excitation Networks`_.
+
+    Args:
+        in_ch (int): Number of channels in the input tensor
+        r (int): Reduction ratio of the SE block. Default: 16
+
+    Shape:
+        - Input: :math:`(N, C, H, W)`
+        - Output: :math:`(N, C, H, W)`, same shape as input
+
+    Examples::
+        >>> input = torch.randn(1, 3, 256, 256)
+        >>> se = SE(in_ch=3, r=16)
+        >>> out = se(input)
+        >>> out.size()
+        torch.Size([1, 3, 256, 256])
+    """
+    def __init__(self, in_ch, r=16):
+        super(SE, self).__init__()
+
+        self.linear_1 = nn.Linear(in_ch, int(in_ch / r))
+        self.linear_2 = nn.Linear(int(in_ch / r), in_ch)
+
+    def forward(self, x):
+        input_x = x
+
+        x = functional.avg_pool2d(x, x.shape[-1])
+        x = x.view(x.shape[0], -1)
+        x = functional.relu(self.linear_1(x), inplace=True)
+        x = self.linear_2(x)
+        x = x.unsqueeze(-1).unsqueeze(-1)
+        x = torch.sigmoid(x)
+        x = torch.mul(input_x, x)
+
+        return x

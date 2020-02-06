@@ -38,6 +38,13 @@ class TestNN(TestCase):
             self.assertEqual(contrib_F.film(inp, half_ones_half_zeros, half_ones_half_neg_ones), output)
             self.assertEqual(output.sum(), inp[:, :5].sum())
 
+    def test_se(self):
+        se = contrib_nn.SE(16)
+        input_16_ch = torch.randn(1, 16, 4, 4, requires_grad=True)
+        output = se(input_16_ch)
+
+        self.assertGradAndGradgradChecks(lambda x: se(x), (input_16_ch,))
+        self.assertEqual(se(input_16_ch), output)
 
 if __name__ == '__main__':
     run_tests()
