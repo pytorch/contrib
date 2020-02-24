@@ -1,5 +1,6 @@
 import unittest
 import torch
+import torch.nn.functional as F
 import torchcontrib
 import torchcontrib.nn as contrib_nn
 import torchcontrib.nn.functional as contrib_F
@@ -37,6 +38,16 @@ class TestNN(TestCase):
             output = m(inp, half_ones_half_zeros, half_ones_half_neg_ones)
             self.assertEqual(contrib_F.film(inp, half_ones_half_zeros, half_ones_half_neg_ones), output)
             self.assertEqual(output.sum(), inp[:, :5].sum())
+
+    def test_ssp(self):
+        m = contrib_nn.SSP(2)
+        input_1d = torch.randn(4, 10, 2, requires_grad=True)
+        input_2d = torch.randn(4, 10, 2, 2, requires_grad=True)
+        input_3d = torch.randn(4, 10, 2, 2, 2, requires_grad=True)
+        sp0 = F.softplus(torch.zeros(1), 2).item()
+        for inp in [input_1d, input_2d, input_3d]:
+            self.assertEqual(m(inp), F.softplus(inp, 2) - sp0)
+            self.assertGradAndGradgradChecks(lambda x: m(x), (inp,))
 
 
 if __name__ == '__main__':
