@@ -150,7 +150,7 @@ class SWA(Optimizer):
     def update_swa_group(self, group):
         r"""Updates the SWA running averages for the given parameter group.
 
-        Arguments:
+        Args:
             param_group (dict): Specifies for what parameter group SWA running
                 averages should be updated
 
